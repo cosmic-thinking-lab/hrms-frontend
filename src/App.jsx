@@ -1,57 +1,87 @@
-import React, { useState, useEffect } from 'react';
-import Layout from './components/Layout';
-import Dashboard from './pages/Dashboard';
-import Employees from './pages/Employees';
-import Departments from './pages/Departments';
-import Attendance from './pages/Attendance';
-import Leaves from './pages/Leaves';
-import Payroll from './pages/Payroll';
-import Notices from './pages/Notices';
-import Documents from './pages/Documents';
-import Settings from './pages/Settings';
-import Home from './pages/Home';
-import { Onboarding, Recruitment, Performance, Travel, Tasks, IntegrationHelp } from './pages/Modules';
-import { initScrollAnimations } from './utils/scrollAnimations';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from './context/AuthContext';
+import Login from './pages/Login';
+import EmployeeDashboard from './pages/EmployeeDashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
+import './styles/common.css';
+
+import Attendance from './pages/employee/Attendance';
+import HolidayList from './pages/employee/HolidayList';
+import LeavePolicy from './pages/employee/LeavePolicy';
+import Onboarding from './pages/employee/Onboarding';
+import Profile from './pages/employee/Profile';
+import SalarySlip from './pages/employee/SalarySlip';
+
+import EmployeeManagement from './pages/admin/EmployeeManagement';
+import ManageHolidays from './pages/admin/ManageHolidays';
+import ManagePolicies from './pages/admin/ManagePolicies';
+import SalaryUpload from './pages/admin/SalaryUpload';
 
 function App() {
-    const [currentPage, setCurrentPage] = useState('home');
-
-    useEffect(() => {
-        // Initialize scroll animations when component mounts
-        const timer = setTimeout(() => {
-            initScrollAnimations();
-        }, 100);
-
-        return () => clearTimeout(timer);
-    }, [currentPage]); // Re-initialize when page changes
-
-    const renderPage = () => {
-        switch (currentPage) {
-            case 'home': return <Home setCurrentPage={setCurrentPage} />;
-            case 'dashboard': return <Dashboard />;
-            case 'employees': return <Employees />;
-            case 'departments': return <Departments />;
-            case 'attendance': return <Attendance />;
-            case 'leaves': return <Leaves />;
-            case 'payroll': return <Payroll />;
-            case 'notices': return <Notices />;
-            case 'documents': return <Documents />;
-            case 'settings': return <Settings />;
-            case 'onboarding': return <Onboarding />;
-            case 'recruitment': return <Recruitment />;
-            case 'performance': return <Performance />;
-            case 'travel': return <Travel />;
-            case 'tasks': return <Tasks />;
-            case 'help': return <IntegrationHelp />;
-            default: return <Dashboard />;
-        }
-    };
-
     return (
-        <Layout currentPage={currentPage} setCurrentPage={setCurrentPage}>
-            {renderPage()}
-        </Layout>
+        <AuthProvider>
+            <Router>
+                <Routes>
+                    <Route path="/" element={<Navigate to="/login" replace />} />
+                    <Route path="/login" element={<Login />} />
+
+                    {/* Employee Routes */}
+                    <Route
+                        path="/employee/dashboard"
+                        element={<ProtectedRoute><EmployeeDashboard /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/employee/attendance"
+                        element={<ProtectedRoute><Attendance /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/employee/holidays"
+                        element={<ProtectedRoute><HolidayList /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/employee/policy"
+                        element={<ProtectedRoute><LeavePolicy /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/employee/onboarding"
+                        element={<ProtectedRoute><Onboarding /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/employee/profile"
+                        element={<ProtectedRoute><Profile /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/employee/salary-slip"
+                        element={<ProtectedRoute><SalarySlip /></ProtectedRoute>}
+                    />
+
+                    {/* Admin Routes */}
+                    <Route
+                        path="/admin/dashboard"
+                        element={<ProtectedRoute adminOnly={true}><AdminDashboard /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/admin/employees"
+                        element={<ProtectedRoute adminOnly={true}><EmployeeManagement /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/admin/holidays"
+                        element={<ProtectedRoute adminOnly={true}><ManageHolidays /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/admin/policies"
+                        element={<ProtectedRoute adminOnly={true}><ManagePolicies /></ProtectedRoute>}
+                    />
+                    <Route
+                        path="/admin/salary-upload"
+                        element={<ProtectedRoute adminOnly={true}><SalaryUpload /></ProtectedRoute>}
+                    />
+                </Routes>
+            </Router>
+        </AuthProvider>
     );
 }
 

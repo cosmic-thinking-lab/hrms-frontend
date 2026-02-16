@@ -1,0 +1,45 @@
+/* Responsive Utility Classes */
+.container-responsive {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
+.grid-2-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+}
+
+@media (max-width: 768px) {
+    .grid-2-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+.flex-responsive {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+@media (max-width: 640px) {
+    .flex-responsive {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+}
+
+.card-responsive {
+    background: white;
+    border-radius: 16px;
+    padding: 32px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 480px) {
+    .card-responsive {
+        padding: 20px;
+    }
+}
