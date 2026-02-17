@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { employees } from '../../utils/dummyData';
 import { getAdminMenuItems } from '../../utils/menuConfig.jsx';
 import { useAuth } from '../../context/AuthContext';
+import { employeeAPI } from '../../utils/api';
 
 const EmployeeManagement = () => {
     const { token } = useAuth();
+    const navigate = useNavigate();
     const [searchTerm, setSearchTerm] = useState('');
     const [employeeList, setEmployeeList] = useState([]);
     const [editingEmployee, setEditingEmployee] = useState(null);
@@ -27,23 +30,9 @@ const EmployeeManagement = () => {
 
     const fetchEmployees = async () => {
         try {
-            const response = await fetch('http://64.227.146.144:3001/api/v1/admin/employees', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const data = await response.json();
-
-            if (response.ok) {
-                // Assuming API returns array or { employees: [] }
-                // Based on typically structured APIs and previous interactions
-                const list = Array.isArray(data) ? data : (data.employees || []);
-                setEmployeeList(list);
-            } else {
-                console.error('Failed to fetch employees:', data.message);
-                // Fallback to dummy data if API fails or for demo? Maybe just log for now.
-                // setEmployeeList(employees); 
-            }
+            const data = await employeeAPI.getAll(token, searchTerm);
+            const list = Array.isArray(data) ? data : (data.employees || data.data || []);
+            setEmployeeList(list);
         } catch (err) {
             console.error('Error fetching employees:', err);
         } finally {
@@ -53,27 +42,16 @@ const EmployeeManagement = () => {
 
     React.useEffect(() => {
         if (token) {
-            fetchEmployees();
+            const timer = setTimeout(() => {
+                fetchEmployees();
+            }, 500);
+            return () => clearTimeout(timer);
         } else {
             setFetching(false);
         }
-    }, [token]);
+    }, [token, searchTerm]);
 
-    const filteredEmployees = employeeList.filter(emp => {
-        const searchLower = searchTerm.toLowerCase();
-        // Handle cases where personalInfo might be structured differently from API vs dummy data
-        const firstName = emp.personalInfo?.firstName?.toLowerCase() || '';
-        const lastName = emp.personalInfo?.lastName?.toLowerCase() || '';
-        const fullName = emp.personalInfo?.fullName?.toLowerCase() || `${firstName} ${lastName}`;
-        const email = emp.personalInfo?.email?.toLowerCase() || '';
-        const empId = emp.employeeId?.toLowerCase() || '';
-        const designation = emp.personalInfo?.designation?.toLowerCase() || '';
-
-        return fullName.includes(searchLower) ||
-            email.includes(searchLower) ||
-            empId.includes(searchLower) ||
-            designation.includes(searchLower);
-    });
+    const filteredEmployees = employeeList;
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -289,6 +267,12 @@ const EmployeeManagement = () => {
                                             </td>
                                             <td style={{ padding: '16px 24px' }}>
                                                 <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button onClick={() => navigate(`/admin/employees/${emp.employeeId}`)} style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#3b82f6', cursor: 'pointer' }} title="View Details">
+                                                        <svg style={{ width: '18px', height: '18px' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                                            <circle cx="12" cy="12" r="3"></circle>
+                                                        </svg>
+                                                    </button>
                                                     <button onClick={() => handleEdit(emp)} style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#64748b', cursor: 'pointer' }}>
                                                         <svg style={{ width: '18px', height: '18px' }} viewBox="0 0 24 24" fill="none">
                                                             <path d="M11 5H6C4.89543 5 4 5.89543 4 7V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V14M16.2426 3.75736C17.0237 2.97631 18.2899 2.97631 19.0711 3.75736C19.8521 4.53841 19.8521 5.80474 19.0711 6.58579L9 16.6569L5 17.6569L6 13.6569L16.2426 3.75736Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -355,7 +339,7 @@ const EmployeeManagement = () => {
                             </div>
                         )}
 
-                        <form onSubmit={handleAddEmployee}>
+                        <form onSubmit={handleSubmit}>
                             <div style={{ marginBottom: '16px' }}>
                                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Full Name</label>
                                 <input

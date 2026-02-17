@@ -36,34 +36,6 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = async (employeeId, password) => {
-        // Mock Login for any email (Demo/Testing purposes)
-        if (employeeId.includes('@')) {
-            const mockEmployeeUser = {
-                employeeId: 'EMP-DEMO-' + Math.floor(Math.random() * 1000),
-                role: 'EMPLOYEE',
-                isFirstLogin: false,
-                personalInfo: {
-                    firstName: 'Demo',
-                    lastName: 'User',
-                    fullName: 'Demo User',
-                    email: employeeId,
-                    phone: '9876543210',
-                    address: 'Demo Address',
-                    designation: 'Software Engineer',
-                    department: 'Engineering',
-                    joiningDate: new Date().toISOString().split('T')[0]
-                }
-            };
-            const mockToken = 'mock-employee-token-' + Date.now();
-
-            setUser(mockEmployeeUser);
-            setToken(mockToken);
-            localStorage.setItem('hrms_user', JSON.stringify(mockEmployeeUser));
-            localStorage.setItem('hrms_token', mockToken);
-
-            return { success: true, role: 'EMPLOYEE', isFirstLogin: false };
-        }
-
         // API login
         try {
             const response = await fetch('http://64.227.146.144:3001/api/v1/auth/login', {
@@ -140,6 +112,14 @@ export const AuthProvider = ({ children }) => {
         return false;
     };
 
+    const updateUser = (userData) => {
+        if (user) {
+            const updatedUser = { ...user, ...userData };
+            setUser(updatedUser);
+            localStorage.setItem('hrms_user', JSON.stringify(updatedUser));
+        }
+    };
+
     const addSalarySlip = (newSlip) => {
         setSlips(prev => [newSlip, ...prev]);
     };
@@ -155,7 +135,8 @@ export const AuthProvider = ({ children }) => {
         isAdmin: user?.role === 'ADMIN',
         isEmployee: user?.role === 'EMPLOYEE',
         salarySlips: slips,
-        addSalarySlip
+        addSalarySlip,
+        updateUser
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

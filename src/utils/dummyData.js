@@ -228,19 +228,46 @@ export const salarySlips = [
 ];
 
 export const holidays = [
+    // January
     { date: '2026-01-01', name: 'New Year\'s Day', type: 'National' },
+    { date: '2026-01-13', name: 'Lohri', type: 'Festival' },
+    { date: '2026-01-14', name: 'Makar Sankranti / Pongal', type: 'Festival' },
     { date: '2026-01-26', name: 'Republic Day', type: 'National' },
-    { date: '2026-03-14', name: 'Holi', type: 'Festival' },
-    { date: '2026-04-02', name: 'Ram Navami', type: 'Festival' },
-    { date: '2026-04-10', name: 'Good Friday', type: 'National' },
+    // February
+    { date: '2026-02-01', name: 'Vasant Panchami', type: 'Festival' },
+    { date: '2026-02-15', name: 'Maha Shivratri', type: 'Festival' },
+    // March
+    { date: '2026-03-04', name: 'Holi', type: 'Festival' },
+    { date: '2026-03-20', name: 'Good Friday', type: 'National' },
+    // April
+    { date: '2026-04-01', name: 'Ram Navami', type: 'Festival' },
+    { date: '2026-04-10', name: 'Mahavir Jayanti', type: 'Festival' },
     { date: '2026-04-14', name: 'Ambedkar Jayanti', type: 'National' },
-    { date: '2026-05-01', name: 'May Day', type: 'National' },
+    { date: '2026-04-20', name: 'Eid-ul-Fitr', type: 'Festival' },
+    // May
+    { date: '2026-05-01', name: 'Buddha Purnima', type: 'Festival' },
+    // July
+    { date: '2026-07-06', name: 'Muharram / Islamic New Year', type: 'Festival' },
+    { date: '2026-07-15', name: 'Rath Yatra', type: 'Festival' },
+    // August
     { date: '2026-08-15', name: 'Independence Day', type: 'National' },
-    { date: '2026-08-27', name: 'Janmashtami', type: 'Festival' },
+    { date: '2026-08-28', name: 'Raksha Bandhan', type: 'Festival' },
+    { date: '2026-08-31', name: 'Janmashtami', type: 'Festival' },
+    // September
+    { date: '2026-09-15', name: 'Ganesh Chaturthi', type: 'Festival' },
+    { date: '2026-09-25', name: 'Onam', type: 'Festival' },
+    // October
     { date: '2026-10-02', name: 'Gandhi Jayanti', type: 'National' },
-    { date: '2026-10-24', name: 'Dussehra', type: 'Festival' },
-    { date: '2026-11-12', name: 'Diwali', type: 'Festival' },
-    { date: '2026-11-13', name: 'Diwali (Second Day)', type: 'Festival' },
+    { date: '2026-10-15', name: 'Durga Puja / Dussehra', type: 'Festival' },
+    { date: '2026-10-20', name: 'Milad-un-Nabi', type: 'Festival' },
+    { date: '2026-10-29', name: 'Karwa Chauth', type: 'Festival' },
+    // November
+    { date: '2026-11-08', name: 'Diwali', type: 'Festival' },
+    { date: '2026-11-09', name: 'Govardhan Puja', type: 'Festival' },
+    { date: '2026-11-10', name: 'Bhai Dooj', type: 'Festival' },
+    { date: '2026-11-16', name: 'Chhath Puja', type: 'Festival' },
+    { date: '2026-11-24', name: 'Guru Nanak Jayanti', type: 'Festival' },
+    // December
     { date: '2026-12-25', name: 'Christmas', type: 'National' }
 ];
 

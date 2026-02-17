@@ -130,23 +130,6 @@ const Login = () => {
                         </button>
                     </form>
 
-                    <div className="login-footer">
-                        <div className="demo-credentials">
-                            <p className="demo-title">Demo Credentials:</p>
-                            <div className="demo-cards">
-                                <div className="demo-card">
-                                    <span className="demo-role">Employee</span>
-                                    <span className="demo-id">EMP-7234</span>
-                                    <span className="demo-pass">password123</span>
-                                </div>
-                                <div className="demo-card">
-                                    <span className="demo-role">Admin</span>
-                                    <span className="demo-id">EMP-ADMIN1</span>
-                                    <span className="demo-pass">YourSecurePassword123!</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
