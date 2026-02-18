@@ -85,8 +85,8 @@ const EmployeeManagement = () => {
         setIsModalOpen(true);
     };
 
-    const handleDelete = (id) => {
-        setDeleteId(id);
+    const handleDelete = (empId) => {
+        setDeleteId(empId);
         setDeleteError('');
     };
 
@@ -94,15 +94,10 @@ const EmployeeManagement = () => {
         if (!deleteId) return;
 
         try {
-            const response = await fetch(`http://64.227.146.144:3001/api/v1/admin/employees/${deleteId}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
+            const response = await employeeAPI.delete(token, deleteId);
 
             if (response.ok) {
-                setEmployeeList(prev => prev.filter(emp => emp._id !== deleteId));
+                setEmployeeList(prev => prev.filter(emp => emp.employeeId !== deleteId));
                 setSuccess('Employee deleted successfully');
                 setDeleteId(null);
                 setTimeout(() => setSuccess(''), 3000);
@@ -123,41 +118,49 @@ const EmployeeManagement = () => {
         setSuccess('');
 
         try {
+            const [firstName = '', ...lastNameParts] = formData.fullName.split(' ');
+            const lastName = lastNameParts.join(' ');
+
             const payload = {
                 personalInfo: {
                     fullName: formData.fullName,
+                    firstName: firstName,
+                    lastName: lastName,
                     email: formData.email,
                     phone: formData.phone
                 },
+                fullName: formData.fullName,
+                firstName: firstName,
+                lastName: lastName,
+                email: formData.email,
+                phone: formData.phone,
                 role: formData.role
             };
 
-            const url = editingEmployee
-                ? `http://64.227.146.144:3001/api/v1/admin/employees/${editingEmployee._id}`
-                : 'http://64.227.146.144:3001/api/v1/admin/employees';
+            let response;
+            if (editingEmployee) {
+                response = await employeeAPI.update(token, editingEmployee.employeeId, payload);
+                console.log('Update result:', response);
+            } else {
+                response = await employeeAPI.create(token, payload);
+            }
 
-            const method = editingEmployee ? 'PUT' : 'POST';
+            // More flexible success check
+            const isSuccess = response.success ||
+                response.message?.toLowerCase().includes('success') ||
+                response.status === 200 ||
+                response._id;
 
-            const response = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                setSuccess(editingEmployee ? 'Employee updated successfully!' : 'Employee added successfully!');
-                fetchEmployees(); // Refresh list to get exact server state
+            if (isSuccess) {
+                setSuccess(response.message || (editingEmployee ? 'Employee updated successfully!' : 'Employee added successfully!'));
+                setError('');
+                fetchEmployees();
 
                 setTimeout(() => {
                     resetForm();
-                }, 1500);
+                }, 2000);
             } else {
-                setError(data.message || (editingEmployee ? 'Failed to update employee' : 'Failed to add employee'));
+                setError(response.message || 'Operation failed');
             }
         } catch (err) {
             console.error('Error saving employee:', err);
@@ -278,7 +281,7 @@ const EmployeeManagement = () => {
                                                             <path d="M11 5H6C4.89543 5 4 5.89543 4 7V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V14M16.2426 3.75736C17.0237 2.97631 18.2899 2.97631 19.0711 3.75736C19.8521 4.53841 19.8521 5.80474 19.0711 6.58579L9 16.6569L5 17.6569L6 13.6569L16.2426 3.75736Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                                         </svg>
                                                     </button>
-                                                    <button onClick={() => handleDelete(emp._id)} style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#ef4444', cursor: 'pointer' }}>
+                                                    <button onClick={() => handleDelete(emp.employeeId)} style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#ef4444', cursor: 'pointer' }}>
                                                         <svg style={{ width: '18px', height: '18px' }} viewBox="0 0 24 24" fill="none">
                                                             <path d="M19 7L18.1327 19.1425C18.0579 20.1891 17.187 21 16.1378 21H7.86224C6.81296 21 5.94208 20.1891 5.86732 19.1425L5 7M10 11V17M14 11V17M15 7V4C15 3.44772 14.5523 3 14 3H10C9.44772 3 9 3.44772 9 4V7M4 7H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                                         </svg>

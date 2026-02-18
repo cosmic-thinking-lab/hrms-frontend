@@ -32,16 +32,17 @@ export const employeeAPI = {
 
   update: async (token, id, data) => {
     const response = await fetch(`${BASE_URL}/admin/employees/${id}`, {
-      method: "PUT",
+      method: "PATCH",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(data),
     });
-    if (!response.ok) return { success: false, message: `Error: ${response.status}` };
+    if (!response.ok) return { success: false, message: `Error: ${response.status} (Endpoint: admin/employees/${id})` };
     const text = await response.text();
-    return text ? JSON.parse(text) : { success: true };
+    const result = text ? JSON.parse(text) : {};
+    return { success: true, ...result };
   },
 
   delete: async (token, id) => {
@@ -71,12 +72,13 @@ export const employeeAPI = {
 
 export const attendanceAPI = {
   getByEmployeeId: async (token, employeeId) => {
-    const response = await fetch(`${BASE_URL}/admin/attendance/employee/${employeeId}`, {
+    const response = await fetch(`${BASE_URL}/user/${employeeId}/attendance`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!response.ok) return { success: false, message: `Error: ${response.status}` };
     const text = await response.text();
-    return text ? JSON.parse(text) : { success: true };
+    const data = text ? JSON.parse(text) : {};
+    return { success: true, ...(Array.isArray(data) ? { records: data } : data) };
   },
   mark: async (token, data) => {
     const response = await fetch(`${BASE_URL}/admin/attendance/mark`, {
@@ -87,9 +89,10 @@ export const attendanceAPI = {
       },
       body: JSON.stringify(data),
     });
-    if (!response.ok) return { success: false, message: `Error: ${response.status}` };
+    if (!response.ok) return { success: false, message: `Error: ${response.status} (Endpoint: admin/attendance/mark)` };
     const text = await response.text();
-    return text ? JSON.parse(text) : { success: true };
+    const result = text ? JSON.parse(text) : {};
+    return { success: true, ...result };
   },
   getByUser: async (token, employeeId) => {
     const response = await fetch(`${BASE_URL}/user/${employeeId}/attendance`, {
@@ -131,6 +134,24 @@ export const onboardingAPI = {
     if (!response.ok) return { success: false, message: `Error: ${response.status}` };
     const text = await response.text();
     return text ? JSON.parse(text) : { success: true };
+  },
+  submitWithFiles: async (token, { education, experience, kycFile, resumeFile }) => {
+    const formData = new FormData();
+    if (education) formData.append("education", JSON.stringify(education));
+    if (experience) formData.append("experience", JSON.stringify(experience));
+    if (kycFile) formData.append("kyc", kycFile);
+    if (resumeFile) formData.append("resume", resumeFile);
+    const response = await fetch(`${BASE_URL}/user/onboarding`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    if (!response.ok) return { success: false, message: `Error: ${response.status}` };
+    const text = await response.text();
+    const result = text ? JSON.parse(text) : {};
+    return { success: true, ...result };
   },
 };
 

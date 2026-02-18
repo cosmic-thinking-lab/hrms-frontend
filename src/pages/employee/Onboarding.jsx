@@ -110,7 +110,6 @@ const Onboarding = () => {
         if (e.target.files[0]) setResumeFile(e.target.files[0]);
     };
 
-    // --- Submit Handler ---
     const handleSubmit = async () => {
         setLoading(true);
         setMessage({ type: '', text: '' });
@@ -123,46 +122,62 @@ const Onboarding = () => {
         }
 
         try {
-            // Prepare data for API
-            // Note: API expects "education" and "experience" arrays. 
-            // We'll send the data collected so far.
-            const payload = {
-                education: education.filter(e => e.institution && e.degree), // Filter empty entries
-                experience: experience.filter(e => e.company && e.role) // Filter empty entries
-                // Documents would typically be sent via FormData, but for this specific API request 
-                // which asks for JSON structure for edu/exp, we will simulate doc upload or handle it if API supports it.
-                // Assuming the prompt implies sending JSON data for edu/exp.
-            };
+            const filteredEducation = education.filter(e => e.institution && e.degree);
+            const filteredExperience = experience.filter(e => e.company && e.role);
 
-            await onboardingAPI.submit(token, payload);
+            let response;
 
-            // Update local user context to reflect changes immediately
-            // Adapt the payload to match what the Profile page expects
-            const profileUpdateData = {
-                education: payload.education.map(e => ({
-                    ...e,
-                    yearOfPassing: e.endYear // Map endYear to yearOfPassing for Profile.jsx
-                })),
-                experience: payload.experience.map(e => ({
-                    companyName: e.company, // Map company to companyName
-                    designation: e.role,    // Map role to designation
-                    startDate: e.startDate, // Preserve start date
-                    endDate: e.endDate,     // Preserve end date
-                    duration: `${e.startDate} - ${e.endDate || 'Present'}` // Format duration
-                })),
-                documents: {
-                    ...(typeof user.documents === 'object' && !Array.isArray(user.documents) ? user.documents : {}),
-                    kycUrl: kycFile ? kycFile.name : (user.documents?.kycUrl || null),
-                    resumeUrl: resumeFile ? resumeFile.name : (user.documents?.resumeUrl || null),
+            if (kycFile || resumeFile) {
+                // Use FormData (multipart) when files are present
+                response = await onboardingAPI.submitWithFiles(token, {
+                    education: filteredEducation,
+                    experience: filteredExperience,
+                    kycFile: kycFile,
+                    resumeFile: resumeFile
+                });
+            } else {
+                // Use JSON when no files
+                response = await onboardingAPI.submit(token, {
+                    education: filteredEducation,
+                    experience: filteredExperience
+                });
+            }
+
+            console.log('Onboarding response:', response);
+
+            if (response.success || response.message?.toLowerCase().includes('success')) {
+                // Update local user context with the server response data
+                const updatedUser = response.user || {};
+                const profileUpdateData = {
+                    education: updatedUser.education || filteredEducation.map(e => ({
+                        ...e,
+                        yearOfPassing: e.endYear
+                    })),
+                    experience: updatedUser.experience || filteredExperience.map(e => ({
+                        companyName: e.company,
+                        designation: e.role,
+                        startDate: e.startDate,
+                        endDate: e.endDate,
+                        duration: `${e.startDate} - ${e.endDate || 'Present'}`
+                    })),
+                };
+
+                // If server returned documents, use them; otherwise keep local file names
+                if (updatedUser.documents && updatedUser.documents.length > 0) {
+                    profileUpdateData.documents = updatedUser.documents;
+                } else {
+                    profileUpdateData.documents = {
+                        ...(typeof user.documents === 'object' && !Array.isArray(user.documents) ? user.documents : {}),
+                        kycUrl: kycFile ? kycFile.name : (user.documents?.kycUrl || null),
+                        resumeUrl: resumeFile ? resumeFile.name : (user.documents?.resumeUrl || null),
+                    };
                 }
-            };
 
-            updateUser(profileUpdateData);
-
-            setMessage({ type: 'success', text: 'Onboarding details submitted successfully!' });
-            // User requested to stay on page, so we removed the auto-redirect.
-            // form can be optionally reset here if needed, but keeping data might be better for review.
-
+                updateUser(profileUpdateData);
+                setMessage({ type: 'success', text: 'Onboarding details submitted successfully!' });
+            } else {
+                setMessage({ type: 'error', text: response.message || 'Failed to submit details.' });
+            }
         } catch (error) {
             console.error('Onboarding submission error:', error);
             setMessage({ type: 'error', text: 'Failed to submit details. Please try again.' });

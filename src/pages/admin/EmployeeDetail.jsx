@@ -17,6 +17,7 @@ const EmployeeDetail = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [updatingRow, setUpdatingRow] = useState(null); // ID of the date being saved
+    const [savedRow, setSavedRow] = useState(null); // ID of the date just saved
     const [inlineData, setInlineData] = useState({}); // { [date]: { status, remarks } }
     const [attendanceRecords, setAttendanceRecords] = useState([]); // Real attendance data
 
@@ -70,47 +71,50 @@ const EmployeeDetail = () => {
 
     const handleMarkAttendance = async (date, status, remarks) => {
         console.log('--- ATTENDANCE MARK START ---');
-        console.log('Target Date:', date);
-        console.log('New Status:', status);
-        console.log('Remarks:', remarks);
-
         setUpdatingRow(date);
         try {
             const payload = {
-                employeeId: id,
+                employeeId: id, // Mapping identifier
+                _id: employee?._id, // Internal ID if needed
                 date: date,
                 status: status,
-                remark: remarks,
-                remarks: remarks
+                remarks: remarks,
+                remark: remarks // For fallback
             };
             console.log('API Payload:', payload);
 
             const response = await attendanceAPI.mark(token, payload);
             console.log('API Response:', response);
 
-            if (response.success || response.data || response === true || (typeof response === 'object' && !response.message)) {
+            // Robust check for success from my new api.js update
+            if (response.success || response.data || response._id) {
                 console.log('Marking Success. Refreshing data...');
-                // Refresh data quietly
-                const data = await employeeAPI.getProfile(token, id);
-                let empData = data.user || data.employee || data.data || data;
-                setEmployee(empData);
 
-                // Refresh attendance records too
+                // Fetch attendance records to verify persistence
                 const attData = await attendanceAPI.getByEmployeeId(token, id);
-                console.log('Refetched Attendance Data:', attData);
                 if (attData && attData.success !== false) {
                     const records = attData.records || attData.data || attData.attendance || (Array.isArray(attData) ? attData : []);
-                    console.log('Extracted Records count:', records.length);
                     setAttendanceRecords(records);
+                    // Clear edited state for this date
+                    setInlineData(prev => {
+                        const copy = { ...prev };
+                        delete copy[date];
+                        return copy;
+                    });
+                    // Show saved indicator
+                    setSavedRow(date);
+                    setTimeout(() => setSavedRow(null), 2000);
+                    console.log('Data Refreshed Successfully');
                 }
             } else {
                 console.error('Failed to mark attendance:', response.message || response);
+                alert(`Error: ${response.message || 'Operation failed'}`);
             }
         } catch (err) {
             console.error('Error marking attendance (EXCEPTION):', err);
         } finally {
-            console.log('--- ATTENDANCE MARK END ---');
             setUpdatingRow(null);
+            console.log('--- ATTENDANCE MARK END ---');
         }
     };
 
@@ -180,8 +184,8 @@ const EmployeeDetail = () => {
         return `${year}-${month}-${day}`;
     };
 
-    // Generate full attendance history from joining date to now
-    const joiningDate = employee.personalInfo?.joiningDate || employee.joiningDate || new Date().toISOString();
+    // Generate full attendance history from joining date (or account creation date) to now
+    const joiningDate = employee.personalInfo?.joiningDate || employee.joiningDate || employee.createdAt || new Date().toISOString();
     const startDate = new Date(joiningDate);
     const today = new Date();
 
@@ -299,6 +303,7 @@ const EmployeeDetail = () => {
                             <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '700', color: '#64748b' }}>Date</th>
                             <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '700', color: '#64748b' }}>Status</th>
                             <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '700', color: '#64748b' }}>Remarks</th>
+                            <th style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '700', color: '#64748b', textAlign: 'center' }}>Action</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -318,11 +323,7 @@ const EmployeeDetail = () => {
                                     <td style={{ padding: '12px 16px' }}>
                                         <select
                                             value={currentStatus}
-                                            onChange={(e) => {
-                                                const newStatus = e.target.value;
-                                                handleInlineChange(record.date, 'status', newStatus);
-                                                handleMarkAttendance(record.date, newStatus, currentRemarks);
-                                            }}
+                                            onChange={(e) => handleInlineChange(record.date, 'status', e.target.value)}
                                             style={{
                                                 fontSize: '11px',
                                                 fontWeight: '700',
@@ -346,13 +347,7 @@ const EmployeeDetail = () => {
                                             type="text"
                                             value={currentRemarks}
                                             onChange={(e) => handleInlineChange(record.date, 'remarks', e.target.value)}
-                                            onBlur={() => handleMarkAttendance(record.date, currentStatus, currentRemarks)}
                                             placeholder={isMissingRecord ? "No record found" : "Add remark..."}
-                                            onFocus={(e) => {
-                                                if (e.target.placeholder === "No record found") {
-                                                    e.target.placeholder = "";
-                                                }
-                                            }}
                                             style={{
                                                 width: '100%',
                                                 padding: '6px 10px',
@@ -364,17 +359,29 @@ const EmployeeDetail = () => {
                                             }}
                                             disabled={isUpdating}
                                         />
-                                        {isUpdating && (
-                                            <span style={{
-                                                position: 'absolute',
-                                                right: '25px',
-                                                top: '50%',
-                                                transform: 'translateY(-50%)',
-                                                fontSize: '10px',
-                                                color: '#6366f1',
-                                                fontWeight: '600'
-                                            }}>Saving...</span>
-                                        )}
+                                    </td>
+                                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                        <button
+                                            onClick={() => handleMarkAttendance(record.date, currentStatus, currentRemarks)}
+                                            disabled={isUpdating}
+                                            style={{
+                                                padding: '6px 16px',
+                                                background: savedRow === record.date
+                                                    ? 'linear-gradient(135deg, #059669 0%, #10b981 100%)'
+                                                    : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '6px',
+                                                fontSize: '12px',
+                                                fontWeight: '600',
+                                                cursor: isUpdating ? 'not-allowed' : 'pointer',
+                                                opacity: isUpdating ? 0.7 : 1,
+                                                minWidth: '80px',
+                                                transition: 'all 0.3s ease'
+                                            }}
+                                        >
+                                            {isUpdating ? 'Saving...' : savedRow === record.date ? 'Saved ✓' : 'Update'}
+                                        </button>
                                     </td>
                                 </tr>
                             );
@@ -385,11 +392,43 @@ const EmployeeDetail = () => {
         </div>
     );
 
-    const renderDocuments = () => (
-        <div className="docs-grid">
-            {employee.documents && Object.keys(employee.documents).length > 0 ? (
-                Object.entries(employee.documents).map(([key, url]) => (
-                    <div key={key} className="doc-card">
+    const renderDocuments = () => {
+        const docs = employee.documents;
+        const hasDocuments = docs && (
+            (Array.isArray(docs) && docs.length > 0) ||
+            (!Array.isArray(docs) && typeof docs === 'object' && Object.keys(docs).length > 0)
+        );
+
+        if (!hasDocuments) {
+            return (
+                <div className="docs-grid">
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', gridColumn: '1 / -1' }}>No documents uploaded for this employee</div>
+                </div>
+            );
+        }
+
+        // Normalize documents to array format
+        let docList = [];
+        if (Array.isArray(docs)) {
+            // API format: [{name, url, type, originalName, ...}]
+            docList = docs.map((doc, i) => ({
+                key: doc._id || doc.name || `doc-${i}`,
+                label: doc.name || doc.originalName || doc.type || `Document ${i + 1}`,
+                url: doc.url || doc.fileUrl || doc.path || '#'
+            }));
+        } else {
+            // Object format from dummy data: { kycUrl: '...', resumeUrl: '...' }
+            docList = Object.entries(docs).map(([key, url]) => ({
+                key,
+                label: key.replace('Url', '').toUpperCase(),
+                url
+            }));
+        }
+
+        return (
+            <div className="docs-grid">
+                {docList.map(doc => (
+                    <div key={doc.key} className="doc-card">
                         <div className="doc-icon">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -397,16 +436,14 @@ const EmployeeDetail = () => {
                             </svg>
                         </div>
                         <div>
-                            <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#1e293b' }}>{key.replace('Url', '').toUpperCase()}</h4>
-                            <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: '#4f46e5', fontWeight: '600', textDecoration: 'none' }}>View Document</a>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#1e293b' }}>{doc.label}</h4>
+                            <a href={doc.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '12px', color: '#4f46e5', fontWeight: '600', textDecoration: 'none' }}>View Document</a>
                         </div>
                     </div>
-                ))
-            ) : (
-                <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', gridColumn: '1 / -1' }}>No documents uploaded for this employee</div>
-            )}
-        </div>
-    );
+                ))}
+            </div>
+        );
+    };
 
     return (
         <Layout menuItems={menuItems} title="Employee Details">
