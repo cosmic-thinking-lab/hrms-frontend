@@ -75,10 +75,10 @@ export const attendanceAPI = {
     const response = await fetch(`${BASE_URL}/user/${employeeId}/attendance`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!response.ok) return { success: false, message: `Error: ${response.status}` };
+    if (!response.ok) return { success: false, message: `Error: ${response.status} (Endpoint: user/${employeeId}/attendance)` };
     const text = await response.text();
     const data = text ? JSON.parse(text) : {};
-    return { success: true, ...(Array.isArray(data) ? { records: data } : data) };
+    return { success: true, records: data.attendance || data.records || (Array.isArray(data) ? data : []), pagination: data.pagination };
   },
   mark: async (token, data) => {
     const response = await fetch(`${BASE_URL}/admin/attendance/mark`, {
@@ -92,16 +92,10 @@ export const attendanceAPI = {
     if (!response.ok) return { success: false, message: `Error: ${response.status} (Endpoint: admin/attendance/mark)` };
     const text = await response.text();
     const result = text ? JSON.parse(text) : {};
-    return { success: true, ...result };
+    return { success: true, ...(result.attendance ? { data: result.attendance } : result) };
   },
   getByUser: async (token, employeeId) => {
-    const response = await fetch(`${BASE_URL}/user/${employeeId}/attendance`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!response.ok) return { success: false, message: `Error: ${response.status}` };
-    const text = await response.text();
-    const data = text ? JSON.parse(text) : {};
-    return { success: true, ...(Array.isArray(data) ? { records: data } : data) };
+    return attendanceAPI.getByEmployeeId(token, employeeId);
   },
 };
 
@@ -135,12 +129,19 @@ export const onboardingAPI = {
     const text = await response.text();
     return text ? JSON.parse(text) : { success: true };
   },
-  submitWithFiles: async (token, { education, experience, kycFile, resumeFile }) => {
+  submitWithFiles: async (token, { education, experience, kycFile, resumeFile, extraFiles = [] }) => {
     const formData = new FormData();
     if (education) formData.append("education", JSON.stringify(education));
     if (experience) formData.append("experience", JSON.stringify(experience));
-    if (kycFile) formData.append("kyc", kycFile);
-    if (resumeFile) formData.append("resume", resumeFile);
+    if (kycFile) formData.append("files", kycFile);
+    if (resumeFile) formData.append("files", resumeFile);
+    extraFiles.forEach(({ name, file }) => {
+      if (file) {
+        // Rename the file with the custom name so the backend stores it with that label
+        const renamed = new File([file], `${name || 'document'}.pdf`, { type: file.type });
+        formData.append("files", renamed);
+      }
+    });
     const response = await fetch(`${BASE_URL}/user/onboarding`, {
       method: "POST",
       headers: {

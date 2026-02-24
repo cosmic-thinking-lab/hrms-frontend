@@ -13,39 +13,27 @@ async function run() {
         if (!token) throw new Error('Login failed');
         console.log('Login OK.');
 
-        const empId = 'EMP-73WZ5X';
+        const empId = 'EMP-G2UU6S';
 
-        // Try various GET endpoints for attendance
-        const endpoints = [
-            `/admin/attendance/employee/${empId}`,
-            `/admin/attendance/${empId}`,
-            `/admin/attendance?employeeId=${empId}`,
-            `/admin/attendances/${empId}`,
-            `/admin/attendances?employeeId=${empId}`,
-            `/attendance/employee/${empId}`,
-            `/attendance/${empId}`,
-            `/attendance?employeeId=${empId}`,
-            `/user/${empId}/attendance`,
-            `/user/attendance/${empId}`,
-            `/admin/employees/${empId}/attendance`,
-            `/admin/employee/${empId}/attendance`,
-        ];
+        // Functional endpoint for attendance
+        const ep = `/user/${empId}/attendance`;
 
-        for (const ep of endpoints) {
-            try {
-                const res = await fetch(`${BASE_URL}${ep}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const status = res.status;
-                const isOk = res.ok;
-                let body = '';
-                if (isOk) {
-                    body = await res.text();
-                }
-                console.log(`GET ${ep} => ${status} ${isOk ? '✅' : '❌'} ${isOk ? body.substring(0, 200) : ''}`);
-            } catch (e) {
-                console.log(`GET ${ep} => Error: ${e.message}`);
+        try {
+            const res = await fetch(`${BASE_URL}${ep}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const status = res.status;
+            const isOk = res.ok;
+            let body = '';
+            if (isOk) {
+                body = await res.text();
             }
+            console.log(`GET ${ep} => ${status} ${isOk ? '✅' : '❌'}`);
+            if (isOk) {
+                console.log('Response:', JSON.stringify(JSON.parse(body), null, 2));
+            }
+        } catch (e) {
+            console.log(`GET ${ep} => Error: ${e.message}`);
         }
     } catch (err) {
         console.error('Fatal:', err);

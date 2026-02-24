@@ -13,6 +13,37 @@ const Profile = () => {
 
     const menuItems = getEmployeeMenuItems();
 
+    const handleDownload = async (url, filename = 'document.pdf') => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(blobUrl);
+        } catch (err) {
+            window.open(url, '_blank');
+        }
+    };
+
+    const handleView = async (url) => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const file = new Blob([blob], { type: 'application/pdf' });
+            const fileURL = URL.createObjectURL(file);
+            window.open(fileURL, '_blank');
+        } catch (err) {
+            window.open(url, '_blank');
+        }
+    };
+
+
+
     React.useEffect(() => {
         const fetchProfile = async () => {
             if (!user?.employeeId || !token) return;
@@ -307,19 +338,29 @@ const Profile = () => {
                             <div className="documents-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' }}>
                                 {(() => {
                                     const docs = displayUser.documents;
-                                    const docEntries = Array.isArray(docs)
-                                        ? docs.map((doc, i) => [`Document ${i + 1}`, doc])
-                                        : Object.entries(docs);
 
-                                    const customLabels = {
-                                        kycUrl: 'KYC Documents',
-                                        resumeUrl: 'Professional Resume'
+                                    const getDocLabel = (url, index) => {
+                                        if (typeof url !== 'string') return `Document ${index + 1}`;
+                                        const raw = decodeURIComponent(url.split('/').pop().split('?')[0]);
+                                        if (raw.includes('.')) return raw;
+                                        return index === 0 ? 'KYC Document' : 'Professional Resume';
                                     };
 
-                                    return docEntries.map(([key, url], index) => {
-                                        if (!url) return null;
-                                        const label = customLabels[key] || key.replace(/Url|File/g, '').replace(/([A-Z])/g, ' $1').trim().toUpperCase();
+                                    const docEntries = Array.isArray(docs)
+                                        ? docs.map((doc, i) => {
+                                            const url = typeof doc === 'string' ? doc : (doc.url || doc.fileUrl || '#');
+                                            const label = (typeof doc === 'object' && (doc.name || doc.originalName))
+                                                ? (doc.name || doc.originalName)
+                                                : getDocLabel(url, i);
+                                            return { label, url };
+                                        })
+                                        : Object.entries(docs).map(([key, url]) => {
+                                            const labelMap = { kycUrl: 'KYC Document', resumeUrl: 'Professional Resume' };
+                                            return { label: labelMap[key] || key, url };
+                                        });
 
+                                    return docEntries.map(({ label, url }, index) => {
+                                        if (!url || url === '#') return null;
                                         return (
                                             <div key={index} className="document-card" style={{
                                                 padding: '20px',
@@ -334,40 +375,46 @@ const Profile = () => {
                                                     width: '48px',
                                                     height: '48px',
                                                     borderRadius: '12px',
-                                                    background: '#e0f2fe',
-                                                    color: '#0284c7',
+                                                    background: '#fee2e2',
+                                                    color: '#dc2626',
                                                     display: 'flex',
                                                     alignItems: 'center',
-                                                    justifyContent: 'center'
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0
                                                 }}>
                                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                                                         <polyline points="14 2 14 8 20 8"></polyline>
+                                                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                                                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                                                        <polyline points="10 9 9 9 8 9"></polyline>
                                                     </svg>
                                                 </div>
                                                 <div style={{ overflow: 'hidden', flex: 1 }}>
-                                                    <h4 style={{ margin: '0 0 4px 0', fontSize: '14px', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    <h4 style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: '600', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                         {label}
                                                     </h4>
-                                                    <p style={{ margin: 0, fontSize: '12px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                        {typeof url === 'string' ? url.split('/').pop() : 'Ready to view'}
-                                                    </p>
-                                                    <a
-                                                        href={url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        style={{
-                                                            display: 'inline-block',
-                                                            marginTop: '8px',
-                                                            fontSize: '11px',
-                                                            color: '#0369a1',
-                                                            background: '#e0f2fe',
-                                                            padding: '2px 8px',
-                                                            borderRadius: '12px',
-                                                            fontWeight: '600',
-                                                            textDecoration: 'none'
-                                                        }}
-                                                    >View File</a>
+                                                    <p style={{ margin: '0 0 10px 0', fontSize: '11px', color: '#94a3b8' }}>PDF Document</p>
+                                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                                        <button onClick={() => handleView(url)} style={{
+                                                            fontSize: '12px', color: '#0369a1', background: '#e0f2fe',
+                                                            padding: '4px 12px', borderRadius: '20px', fontWeight: '600',
+                                                            textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                                            border: 'none', cursor: 'pointer'
+                                                        }}>
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                                                            View
+                                                        </button>
+                                                        <button onClick={() => handleDownload(url, label + '.pdf')} style={{
+                                                            fontSize: '12px', color: '#065f46', background: '#d1fae5',
+                                                            padding: '4px 12px', borderRadius: '20px', fontWeight: '600',
+                                                            textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                                            border: 'none', cursor: 'pointer'
+                                                        }}>
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                                                            Download
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );

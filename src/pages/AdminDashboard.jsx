@@ -1,19 +1,51 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { employees, attendance, salarySlips } from '../utils/dummyData';
 import { getAdminMenuItems } from '../utils/menuConfig.jsx';
+import { employeeAPI } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
+    const { token } = useAuth();
+    const [stats, setStats] = useState({
+        totalEmployees: 0,
+        activeEmployees: 0,
+        presentToday: 0,
+        onLeave: 0
+    });
+    const [recentEmployees, setRecentEmployees] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    const stats = {
-        totalEmployees: employees.length,
-        activeEmployees: employees.filter(e => e.status === 'ACTIVE').length,
-        presentToday: attendance.filter(a => a.status === 'PRESENT' && new Date(a.date).toDateString() === new Date().toDateString()).length,
-        onLeave: attendance.filter(a => a.status === 'LEAVE' && new Date(a.date).toDateString() === new Date().toDateString()).length
-    };
+    useEffect(() => {
+        const fetchDashboardData = async () => {
+            try {
+                // Fetch first page of employees to get total count and recent hires
+                const response = await employeeAPI.getAll(token, "", "", 1, 5);
+                if (response && response.employees) {
+                    const total = response.pagination?.total || response.employees.length;
+                    // For active count, we would ideally have a backend stat, 
+                    // but for now we'll estimate or fetch more if needed.
+                    // Here we just use the total from pagination.
+                    setStats(prev => ({
+                        ...prev,
+                        totalEmployees: total,
+                        activeEmployees: response.employees.filter(e => e.status === 'ACTIVE').length || total
+                    }));
+                    setRecentEmployees(response.employees.slice(0, 3));
+                }
+            } catch (error) {
+                console.error('Error fetching dashboard data:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        if (token) {
+            fetchDashboardData();
+        }
+    }, [token]);
 
     const menuItems = getAdminMenuItems();
 
@@ -61,19 +93,19 @@ const AdminDashboard = () => {
                 <div className="stats-grid">
                     <div className="stat-card stat-blue">
                         <div className="stat-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M17 21V19C17 17.9391 16.5786 16.9217 15.8284 16.1716C15.0783 15.4214 14.0609 15 13 15H5C3.93913 15 2.92172 15.4214 2.17157 16.1716C1.42143 16.9217 1 17.9391 1 19V21M13 7C13 9.20914 11.2091 11 9 11C6.79086 11 5 9.20914 5 7C5 4.79086 6.79086 3 9 3C11.2091 3 13 4.79086 13 7Z" stroke="currentColor" strokeWidth="2" /></svg></div>
-                        <div className="stat-details"><span className="stat-label">Total Employees</span><span className="stat-value">{stats.totalEmployees}</span></div>
+                        <div className="stat-details"><span className="stat-label">Total Employees</span><span className="stat-value">{loading ? '...' : stats.totalEmployees}</span></div>
                     </div>
                     <div className="stat-card stat-green">
                         <div className="stat-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M22 11.08V12C21.9988 14.1564 21.3005 16.2547 20.0093 17.9818C18.7182 19.7088 16.9033 20.9725 14.8354 21.5839C12.7674 22.1953 10.5573 22.1219 8.53447 21.3746C6.51168 20.6273 4.78465 19.2461 3.61096 17.4371C2.43727 15.628 1.87979 13.4881 2.02168 11.3363C2.16356 9.18455 2.99721 7.13631 4.39828 5.49706C5.79935 3.85781 7.69279 2.71537 9.79619 2.24013C11.8996 1.7649 14.1003 1.98232 16.07 2.85999M22 4L12 14.01L9 11.01" stroke="currentColor" strokeWidth="2" /></svg></div>
-                        <div className="stat-details"><span className="stat-label">Active Employees</span><span className="stat-value">{stats.activeEmployees}</span></div>
+                        <div className="stat-details"><span className="stat-label">Active Employees</span><span className="stat-value">{loading ? '...' : stats.activeEmployees}</span></div>
                     </div>
                     <div className="stat-card stat-purple">
                         <div className="stat-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M8 2V5M16 2V5M3.5 9.09H20.5M21 8.5V17C21 20 19.5 22 16 22H8C4.5 22 3 20 3 17V8.5C3 5.5 4.5 3.5 8 3.5H16C19.5 3.5 21 5.5 21 8.5Z" stroke="currentColor" strokeWidth="2" /></svg></div>
-                        <div className="stat-details"><span className="stat-label">Present Today</span><span className="stat-value">{stats.presentToday}</span></div>
+                        <div className="stat-details"><span className="stat-label">Present Today</span><span className="stat-value">{stats.presentToday || '-'}</span></div>
                     </div>
                     <div className="stat-card stat-orange">
                         <div className="stat-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M18 8L6 20M6 8L18 20" stroke="currentColor" strokeWidth="2" /></svg></div>
-                        <div className="stat-details"><span className="stat-label">On Leave</span><span className="stat-value">{stats.onLeave}</span></div>
+                        <div className="stat-details"><span className="stat-label">On Leave</span><span className="stat-value">{stats.onLeave || '-'}</span></div>
                     </div>
                 </div>
 
@@ -94,18 +126,27 @@ const AdminDashboard = () => {
                     <div className="info-card">
                         <h3 className="card-title">Recent Employees</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                            {employees.slice(0, 3).map((emp) => (
-                                <div key={emp._id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: '#f8fafc', borderRadius: '10px' }}>
-                                    <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>
-                                        {emp.personalInfo.firstName[0]}{emp.personalInfo.lastName[0]}
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>{emp.personalInfo.firstName} {emp.personalInfo.lastName}</div>
-                                        <div style={{ fontSize: '12px', color: '#64748b' }}>{emp.personalInfo.designation}</div>
-                                    </div>
-                                    <span style={{ fontSize: '12px', color: '#667eea', fontWeight: '600' }}>{emp.employeeId}</span>
-                                </div>
-                            ))}
+                            {recentEmployees.length > 0 ? (
+                                recentEmployees.map((emp) => {
+                                    const fullName = emp.personalInfo?.fullName ||
+                                        (emp.personalInfo?.firstName ? `${emp.personalInfo.firstName} ${emp.personalInfo.lastName || ''}`.trim() : 'Employee');
+                                    const initial = (fullName[0] || 'E').toUpperCase();
+                                    return (
+                                        <div key={emp._id} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', background: '#f8fafc', borderRadius: '10px' }}>
+                                            <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700' }}>
+                                                {initial}
+                                            </div>
+                                            <div style={{ flex: 1 }}>
+                                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b' }}>{fullName}</div>
+                                                <div style={{ fontSize: '12px', color: '#64748b' }}>{emp.personalInfo?.designation || 'New Hire'}</div>
+                                            </div>
+                                            <span style={{ fontSize: '12px', color: '#667eea', fontWeight: '600' }}>{emp.employeeId}</span>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div style={{ textAlign: 'center', padding: '20px', color: '#64748b' }}>{loading ? 'Loading employees...' : 'No employees found'}</div>
+                            )}
                         </div>
                     </div>
 
@@ -113,16 +154,16 @@ const AdminDashboard = () => {
                         <h3 className="card-title">System Overview</h3>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '14px', color: '#64748b' }}>Total Salary Slips</span>
-                                <span style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>{salarySlips.length}</span>
+                                <span style={{ fontSize: '14px', color: '#64748b' }}>Total Employees</span>
+                                <span style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>{stats.totalEmployees}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '14px', color: '#64748b' }}>Departments</span>
-                                <span style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>3</span>
+                                <span style={{ fontSize: '14px', color: '#64748b' }}>Active Employees</span>
+                                <span style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>{stats.activeEmployees}</span>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <span style={{ fontSize: '14px', color: '#64748b' }}>Attendance Records</span>
-                                <span style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>{attendance.length}</span>
+                                <span style={{ fontSize: '14px', color: '#64748b' }}>System Status</span>
+                                <span style={{ fontSize: '14px', fontWeight: '600', color: '#059669' }}>Operational</span>
                             </div>
                         </div>
                     </div>

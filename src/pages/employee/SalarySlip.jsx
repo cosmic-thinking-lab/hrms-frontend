@@ -39,9 +39,36 @@ const SalarySlip = () => {
         }
     }, [token, user]);
 
+    const handleView = async (url) => {
+        try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const file = new Blob([blob], { type: 'application/pdf' });
+            const fileURL = URL.createObjectURL(file);
+            window.open(fileURL, '_blank');
+        } catch (err) {
+            window.open(url, '_blank');
+        }
+    };
+
     const handleDownload = async (slip) => {
         if (slip.fileUrl || slip.url) {
-            window.open(slip.fileUrl || slip.url, '_blank');
+            const url = slip.fileUrl || slip.url;
+            const filename = `SalarySlip_${monthNames[slip.month - 1]}_${slip.year}.pdf`;
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(blobUrl);
+            } catch (err) {
+                window.open(url, '_blank');
+            }
             return;
         }
 
@@ -51,36 +78,30 @@ const SalarySlip = () => {
         setDownloadingId(slip._id);
         try {
             const canvas = await html2canvas(element, {
-                scale: 3, // Higher resolution
+                scale: 3,
                 useCORS: true,
                 backgroundColor: '#ffffff',
                 logging: false,
-                windowWidth: 1200, // Ensure a consistent viewport width for capture
+                windowWidth: 1200,
                 onclone: (clonedDoc) => {
                     const clonedElement = clonedDoc.getElementById(`slip-${slip._id}`);
                     if (clonedElement) {
-                        clonedElement.style.width = '800px'; // Fixed width for better PDF layout
+                        clonedElement.style.width = '800px';
                         clonedElement.style.padding = '40px';
-                        const btn = clonedElement.querySelector('.download-btn-container');
-                        if (btn) btn.style.display = 'none';
+                        const btnContainer = clonedElement.querySelector('.slip-actions');
+                        if (btnContainer) btnContainer.style.display = 'none';
                     }
                 }
             });
 
             const imgData = canvas.toDataURL('image/png');
-
-            // Standard A4 dimensions in mm
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-
-            const margin = 10; // 10mm margin
+            const margin = 10;
             const imgWidth = pdfWidth - (2 * margin);
             const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-            // Add image with top margin
             pdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight);
-
             pdf.save(`SalarySlip_${monthNames[slip.month - 1]}_${slip.year}.pdf`);
         } catch (error) {
             console.error('Error generating PDF:', error);
@@ -112,126 +133,95 @@ const SalarySlip = () => {
                                     overflow: 'hidden'
                                 }}
                             >
-                                <div className="flex-responsive" style={{ justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: slip.details ? '24px' : '0' }}>
-                                    <div>
-                                        <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1e293b', margin: '0 0 8px 0' }}>
-                                            {monthNames[slip.month - 1]} {slip.year}
-                                        </h3>
-                                        <span style={{ fontSize: '14px', color: '#64748b' }}>
-                                            Uploaded on {new Date(slip.uploadedAt || slip.createdAt).toLocaleDateString()}
-                                        </span>
-                                    </div>
-                                    {slip.details?.netSalary && (
-                                        <div style={{ fontSize: '24px', fontWeight: '800', color: '#10b981' }}>
-                                            ₹{slip.details.netSalary.toLocaleString()}
-                                        </div>
-                                    )}
-                                </div>
-
-                                {slip.details ? (
-                                    <div className="grid-2-col" style={{ gap: '32px', padding: '20px', background: '#f8fafc', borderRadius: '12px' }}>
-                                        <div>
-                                            <h4 style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px' }}>Earnings</h4>
-                                            <div style={{ display: 'grid', gap: '8px' }}>
-                                                {slip.details.basicSalary && (
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                                                        <span>Basic Salary</span>
-                                                        <span style={{ fontWeight: '600' }}>₹{slip.details.basicSalary.toLocaleString()}</span>
-                                                    </div>
-                                                )}
-                                                {slip.details.hra && (
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                                                        <span>HRA</span>
-                                                        <span style={{ fontWeight: '600' }}>₹{slip.details.hra.toLocaleString()}</span>
-                                                    </div>
-                                                )}
-                                                {slip.details.allowances && (
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                                                        <span>Allowances</span>
-                                                        <span style={{ fontWeight: '600' }}>₹{slip.details.allowances.toLocaleString()}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <h4 style={{ fontSize: '13px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', marginBottom: '12px' }}>Deductions</h4>
-                                            <div style={{ display: 'grid', gap: '8px' }}>
-                                                {slip.details.deductions && (
-                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '14px' }}>
-                                                        <span>Standard Deductions</span>
-                                                        <span style={{ fontWeight: '600', color: '#ef4444' }}>-₹{slip.details.deductions.toLocaleString()}</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div style={{
-                                        marginTop: '20px',
-                                        padding: '40px 20px',
-                                        background: '#f1f5f9',
-                                        borderRadius: '12px',
-                                        textAlign: 'center',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        alignItems: 'center',
-                                        gap: '12px'
-                                    }}>
+                                <div className="flex-responsive" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                                         <div style={{
-                                            width: '48px',
-                                            height: '48px',
-                                            borderRadius: '50%',
-                                            background: '#e2e8f0',
+                                            width: '44px',
+                                            height: '44px',
+                                            borderRadius: '12px',
+                                            background: '#f1f5f9',
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             color: '#64748b'
                                         }}>
-                                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                                                 <polyline points="14 2 14 8 20 8"></polyline>
                                             </svg>
                                         </div>
                                         <div>
-                                            <p style={{ margin: 0, fontWeight: '600', color: '#475569' }}>Salary Slip Available</p>
-                                            <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#64748b' }}>Detailed breakdown is available in the PDF file.</p>
+                                            <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b', margin: '0 0 2px 0' }}>
+                                                {monthNames[slip.month - 1]} {slip.year}
+                                            </h3>
+                                            <span style={{ fontSize: '12px', color: '#94a3b8' }}>
+                                                Uploaded on {new Date(slip.uploadedAt || slip.createdAt).toLocaleDateString()}
+                                            </span>
                                         </div>
                                     </div>
-                                )}
 
-                                <div className="download-btn-container" style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
-                                    <button
-                                        onClick={() => handleDownload(slip)}
-                                        disabled={downloadingId === slip._id}
-                                        style={{
-                                            padding: '12px 24px',
-                                            background: downloadingId === slip._id ? '#94a3b8' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                                            color: 'white',
-                                            borderRadius: '10px',
-                                            fontSize: '14px',
-                                            fontWeight: '600',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '8px',
-                                            cursor: downloadingId === slip._id ? 'not-allowed' : 'pointer',
-                                            border: 'none',
-                                            boxShadow: '0 4px 12px rgba(118, 75, 162, 0.2)'
-                                        }}
-                                    >
-                                        {downloadingId === slip._id ? (
-                                            <>
-                                                <div className="spinner" style={{ width: '16px', height: '16px', borderWidth: '2px', borderLeftColor: '#fff' }}></div>
-                                                Generating...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <svg viewBox="0 0 24 24" fill="none" style={{ width: '18px', height: '18px' }}>
-                                                    <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M7 10L12 15M12 15L17 10M12 15V3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                </svg>
-                                                {slip.fileUrl || slip.url ? 'View/Download PDF' : 'Generate & Download PDF'}
-                                            </>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                        {slip.details?.netSalary && (
+                                            <div style={{ fontSize: '18px', fontWeight: '800', color: '#10b981' }}>
+                                                ₹{slip.details.netSalary.toLocaleString()}
+                                            </div>
                                         )}
-                                    </button>
+
+                                        <div className="slip-actions" style={{ display: 'flex', gap: '10px' }}>
+                                            <button
+                                                onClick={() => handleView(slip.fileUrl || slip.url)}
+                                                disabled={downloadingId === slip._id}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    background: '#eef2ff',
+                                                    color: '#4f46e5',
+                                                    borderRadius: '8px',
+                                                    fontSize: '13px',
+                                                    fontWeight: '600',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    cursor: downloadingId === slip._id ? 'not-allowed' : 'pointer',
+                                                    border: 'none',
+                                                    transition: 'all 0.2s'
+                                                }}
+                                            >
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                                                View
+                                            </button>
+                                            <button
+                                                onClick={() => handleDownload(slip)}
+                                                disabled={downloadingId === slip._id}
+                                                style={{
+                                                    padding: '8px 16px',
+                                                    background: downloadingId === slip._id ? '#94a3b8' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                    color: 'white',
+                                                    borderRadius: '8px',
+                                                    fontSize: '13px',
+                                                    fontWeight: '600',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '6px',
+                                                    cursor: downloadingId === slip._id ? 'not-allowed' : 'pointer',
+                                                    border: 'none',
+                                                    transition: 'all 0.2s',
+                                                    boxShadow: downloadingId === slip._id ? 'none' : '0 4px 10px rgba(118, 75, 162, 0.2)'
+                                                }}
+                                            >
+                                                {downloadingId === slip._id ? (
+                                                    <>
+                                                        <div className="spinner" style={{ width: '12px', height: '12px', borderWidth: '2px', borderLeftColor: '#fff' }}></div>
+                                                        ...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                                                        Download
+                                                    </>
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         ))

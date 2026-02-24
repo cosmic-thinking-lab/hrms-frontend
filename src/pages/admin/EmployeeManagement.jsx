@@ -12,13 +12,16 @@ const EmployeeManagement = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [employeeList, setEmployeeList] = useState([]);
     const [editingEmployee, setEditingEmployee] = useState(null);
-    const [deleteId, setDeleteId] = useState(null);
-    const [deleteError, setDeleteError] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [formData, setFormData] = useState({
         fullName: '',
         email: '',
         phone: '',
+        dateOfBirth: '',
+        address: '',
+        designation: '',
+        department: '',
+        joiningDate: '',
         role: 'EMPLOYEE'
     });
     const [loading, setLoading] = useState(false);
@@ -66,6 +69,11 @@ const EmployeeManagement = () => {
             fullName: '',
             email: '',
             phone: '',
+            dateOfBirth: '',
+            address: '',
+            designation: '',
+            department: '',
+            joiningDate: '',
             role: 'EMPLOYEE'
         });
         setEditingEmployee(null);
@@ -76,39 +84,20 @@ const EmployeeManagement = () => {
 
     const handleEdit = (employee) => {
         setEditingEmployee(employee);
+        const dob = employee.personalInfo?.dateOfBirth;
+        const joining = employee.personalInfo?.joiningDate;
         setFormData({
             fullName: employee.personalInfo?.fullName || `${employee.personalInfo?.firstName || ''} ${employee.personalInfo?.lastName || ''}`.trim(),
             email: employee.personalInfo?.email || '',
             phone: employee.personalInfo?.phone || '',
+            dateOfBirth: dob ? dob.split('T')[0] : '',
+            address: employee.personalInfo?.address || '',
+            designation: employee.personalInfo?.designation || '',
+            department: employee.personalInfo?.department || '',
+            joiningDate: joining ? joining.split('T')[0] : '',
             role: employee.role || 'EMPLOYEE'
         });
         setIsModalOpen(true);
-    };
-
-    const handleDelete = (empId) => {
-        setDeleteId(empId);
-        setDeleteError('');
-    };
-
-    const confirmDelete = async () => {
-        if (!deleteId) return;
-
-        try {
-            const response = await employeeAPI.delete(token, deleteId);
-
-            if (response.ok) {
-                setEmployeeList(prev => prev.filter(emp => emp.employeeId !== deleteId));
-                setSuccess('Employee deleted successfully');
-                setDeleteId(null);
-                setTimeout(() => setSuccess(''), 3000);
-            } else {
-                const data = await response.json();
-                setDeleteError(data.message || 'Failed to delete employee');
-            }
-        } catch (err) {
-            console.error('Error deleting employee:', err);
-            setDeleteError('Failed to delete employee');
-        }
     };
 
     const handleSubmit = async (e) => {
@@ -127,7 +116,12 @@ const EmployeeManagement = () => {
                     firstName: firstName,
                     lastName: lastName,
                     email: formData.email,
-                    phone: formData.phone
+                    phone: formData.phone,
+                    dateOfBirth: formData.dateOfBirth || undefined,
+                    address: formData.address || undefined,
+                    designation: formData.designation || undefined,
+                    department: formData.department || undefined,
+                    joiningDate: formData.joiningDate || undefined
                 },
                 fullName: formData.fullName,
                 firstName: firstName,
@@ -276,14 +270,9 @@ const EmployeeManagement = () => {
                                                             <circle cx="12" cy="12" r="3"></circle>
                                                         </svg>
                                                     </button>
-                                                    <button onClick={() => handleEdit(emp)} style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#64748b', cursor: 'pointer' }}>
+                                                    <button onClick={() => handleEdit(emp)} style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#64748b', cursor: 'pointer' }} title="Edit Details">
                                                         <svg style={{ width: '18px', height: '18px' }} viewBox="0 0 24 24" fill="none">
                                                             <path d="M11 5H6C4.89543 5 4 5.89543 4 7V19C4 20.1046 4.89543 21 6 21H18C19.1046 21 20 20.1046 20 19V14M16.2426 3.75736C17.0237 2.97631 18.2899 2.97631 19.0711 3.75736C19.8521 4.53841 19.8521 5.80474 19.0711 6.58579L9 16.6569L5 17.6569L6 13.6569L16.2426 3.75736Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                        </svg>
-                                                    </button>
-                                                    <button onClick={() => handleDelete(emp.employeeId)} style={{ padding: '8px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', color: '#ef4444', cursor: 'pointer' }}>
-                                                        <svg style={{ width: '18px', height: '18px' }} viewBox="0 0 24 24" fill="none">
-                                                            <path d="M19 7L18.1327 19.1425C18.0579 20.1891 17.187 21 16.1378 21H7.86224C6.81296 21 5.94208 20.1891 5.86732 19.1425L5 7M10 11V17M14 11V17M15 7V4C15 3.44772 14.5523 3 14 3H10C9.44772 3 9 3.44772 9 4V7M4 7H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                                                         </svg>
                                                     </button>
                                                 </div>
@@ -316,9 +305,11 @@ const EmployeeManagement = () => {
                         background: 'white',
                         borderRadius: '16px',
                         width: '90%',
-                        maxWidth: '500px',
+                        maxWidth: '600px',
                         padding: '32px',
-                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+                        maxHeight: '90vh',
+                        overflowY: 'auto'
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
                             <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1e293b', margin: 0 }}>{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</h2>
@@ -382,7 +373,65 @@ const EmployeeManagement = () => {
                                 />
                             </div>
 
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Date of Birth</label>
+                                    <input
+                                        type="date"
+                                        name="dateOfBirth"
+                                        value={formData.dateOfBirth}
+                                        onChange={handleInputChange}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', boxSizing: 'border-box' }}
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Joining Date</label>
+                                    <input
+                                        type="date"
+                                        name="joiningDate"
+                                        value={formData.joiningDate}
+                                        onChange={handleInputChange}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', boxSizing: 'border-box' }}
+                                    />
+                                </div>
+                            </div>
 
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Designation</label>
+                                    <input
+                                        type="text"
+                                        name="designation"
+                                        value={formData.designation}
+                                        onChange={handleInputChange}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', boxSizing: 'border-box' }}
+                                        placeholder="e.g. Software Engineer"
+                                    />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Department</label>
+                                    <input
+                                        type="text"
+                                        name="department"
+                                        value={formData.department}
+                                        onChange={handleInputChange}
+                                        style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', boxSizing: 'border-box' }}
+                                        placeholder="e.g. Engineering"
+                                    />
+                                </div>
+                            </div>
+
+                            <div style={{ marginBottom: '16px' }}>
+                                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#475569', marginBottom: '8px' }}>Address</label>
+                                <textarea
+                                    name="address"
+                                    value={formData.address}
+                                    onChange={handleInputChange}
+                                    rows={2}
+                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', resize: 'vertical', fontFamily: 'inherit', fontSize: '14px', boxSizing: 'border-box' }}
+                                    placeholder="e.g. 123 Main St, City, State"
+                                />
+                            </div>
 
                             <div style={{ display: 'flex', gap: '12px' }}>
                                 <button
@@ -420,93 +469,6 @@ const EmployeeManagement = () => {
                                 </button>
                             </div>
                         </form>
-                    </div>
-                </div>
-            )}
-            {/* Delete Confirmation Modal */}
-            {deleteId && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.5)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000,
-                    backdropFilter: 'blur(5px)'
-                }}>
-                    <div style={{
-                        background: 'white',
-                        borderRadius: '16px',
-                        width: '90%',
-                        maxWidth: '400px',
-                        padding: '32px',
-                        textAlign: 'center',
-                        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
-                    }}>
-                        <div style={{ marginBottom: '24px' }}>
-                            <div style={{
-                                width: '64px',
-                                height: '64px',
-                                background: '#fee2e2',
-                                color: '#ef4444',
-                                borderRadius: '50%',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                margin: '0 auto 16px'
-                            }}>
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M19 7L18.1327 19.1425C18.0579 20.1891 17.187 21 16.1378 21H7.86224C6.81296 21 5.94208 20.1891 5.86732 19.1425L5 7M10 11V17M14 11V17M15 7V4C15 3.44772 14.5523 3 14 3H10C9.44772 3 9 3.44772 9 4V7M4 7H20"></path>
-                                </svg>
-                            </div>
-                            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1e293b', margin: '0 0 8px 0' }}>Confirm Delete</h3>
-                            <p style={{ color: '#64748b', fontSize: '15px', margin: 0 }}>
-                                Are you sure you want to delete this employee? This action cannot be undone.
-                            </p>
-                        </div>
-
-                        {deleteError && (
-                            <div style={{ padding: '12px', background: '#fef2f2', color: '#ef4444', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' }}>
-                                {deleteError}
-                            </div>
-                        )}
-
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                            <button
-                                onClick={() => setDeleteId(null)}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px',
-                                    background: '#f1f5f9',
-                                    color: '#475569',
-                                    borderRadius: '8px',
-                                    border: 'none',
-                                    fontWeight: '600',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={confirmDelete}
-                                style={{
-                                    flex: 1,
-                                    padding: '12px',
-                                    background: '#ef4444',
-                                    color: 'white',
-                                    borderRadius: '8px',
-                                    border: 'none',
-                                    fontWeight: '600',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                Delete
-                            </button>
-                        </div>
                     </div>
                 </div>
             )}
