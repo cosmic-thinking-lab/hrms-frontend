@@ -38,7 +38,7 @@ export const AuthProvider = ({ children }) => {
     const login = async (employeeId, password) => {
         // API login
         try {
-            const response = await fetch('http://64.227.146.144:3001/api/v1/auth/login', {
+            const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

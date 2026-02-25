@@ -1,4 +1,4 @@
-export const BASE_URL = "http://64.227.146.144:3001/api/v1";
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const employeeAPI = {
   getAll: async (token, search = "", role = "", page = 1, limit = 10) => {

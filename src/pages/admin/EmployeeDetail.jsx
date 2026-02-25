@@ -381,6 +381,20 @@ const EmployeeDetail = () => {
                     }}>
                         <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>Mark Attendance</h3>
                         <form onSubmit={handleMarkAttendance}>
+                            {attFormData.date && attendanceRecords.some(r => normalizeDate(r.date) === attFormData.date) && (
+                                <div style={{
+                                    padding: '10px',
+                                    background: '#fff7ed',
+                                    color: '#c2410c',
+                                    borderRadius: '8px',
+                                    fontSize: '12px',
+                                    marginBottom: '16px',
+                                    border: '1px solid #ffedd5',
+                                    fontWeight: '500'
+                                }}>
+                                    ⚠️ Attendance is already marked for this date.
+                                </div>
+                            )}
                             <div style={{ marginBottom: '16px' }}>
                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Date</label>
                                 <input
@@ -423,12 +437,14 @@ const EmployeeDetail = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={attSaving}
+                                    disabled={attSaving || (!!attFormData.date && attendanceRecords.some(r => normalizeDate(r.date) === attFormData.date))}
                                     style={{
                                         flex: 1, padding: '10px',
-                                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                        background: (attFormData.date && attendanceRecords.some(r => normalizeDate(r.date) === attFormData.date))
+                                            ? '#cbd5e1'
+                                            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                                         color: 'white', border: 'none', borderRadius: '8px', fontWeight: '600',
-                                        cursor: attSaving ? 'not-allowed' : 'pointer',
+                                        cursor: (attSaving || (attFormData.date && attendanceRecords.some(r => normalizeDate(r.date) === attFormData.date))) ? 'not-allowed' : 'pointer',
                                         opacity: attSaving ? 0.7 : 1
                                     }}
                                 >
