@@ -1,5 +1,5 @@
 
-const BASE_URL = process.env.VITE_API_BASE_URL || 'http://64.227.146.144:3001/api/v1';
+const BASE_URL = process.env.VITE_API_BASE_URL || 'https://apis-hrms.duckdns.org/api/v1';
 
 async function run() {
     try {
