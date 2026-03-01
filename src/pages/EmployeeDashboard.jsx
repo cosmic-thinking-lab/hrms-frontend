@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
-import { attendance, salarySlips, holidays } from '../utils/dummyData';
+import { attendance, salarySlips, holidays as initialHolidays } from '../utils/dummyData';
 import { getEmployeeMenuItems } from '../utils/menuConfig.jsx';
 import './EmployeeDashboard.css';
 
@@ -20,10 +20,23 @@ const EmployeeDashboard = () => {
     const userSalarySlips = salarySlips.filter(s => s.employeeId === user.employeeId);
     const latestSalary = userSalarySlips[0];
 
-    // Get upcoming holidays
+    // Get holidays from localStorage or fallback to dummy data
+    const holidayList = (() => {
+        const saved = localStorage.getItem('hrms_holidays');
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch (e) {
+                console.error('Error parsing saved holidays', e);
+            }
+        }
+        return initialHolidays;
+    })();
+
+    // Get upcoming holidays (only enabled ones)
     const today = new Date();
-    const upcomingHolidays = holidays
-        .filter(h => new Date(h.date) > today)
+    const upcomingHolidays = holidayList
+        .filter(h => !h.isDisabled && new Date(h.date) > today)
         .slice(0, 3);
 
     const menuItems = getEmployeeMenuItems();

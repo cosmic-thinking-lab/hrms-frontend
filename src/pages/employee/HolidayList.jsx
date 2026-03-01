@@ -27,14 +27,12 @@ const HolidayList = () => {
                         <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1e293b', margin: 0 }}>Company Holidays {currentYear}</h3>
                     </div>
                     <div style={{ padding: '0 32px' }}>
-                        {holidayList.map((holiday, index) => (
+                        {holidayList.filter(h => !h.isDisabled).map((holiday, index, filteredList) => (
                             <div key={index} className="flex-responsive" style={{
                                 alignItems: 'center',
                                 gap: '24px',
                                 padding: '20px 0',
-                                borderBottom: index === holidayList.length - 1 ? 'none' : '1px solid #f1f5f9',
-                                filter: holiday.isDisabled ? 'grayscale(1)' : 'none',
-                                opacity: holiday.isDisabled ? 0.6 : 1,
+                                borderBottom: index === filteredList.length - 1 ? 'none' : '1px solid #f1f5f9',
                                 transition: 'all 0.3s ease'
                             }}>
                                 <div style={{

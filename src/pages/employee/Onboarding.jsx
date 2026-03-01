@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import Layout from '../../components/Layout';
 import { getEmployeeMenuItems } from '../../utils/menuConfig.jsx';
-import { onboardingAPI } from '../../utils/api'; // Import API
+import { onboardingAPI, employeeAPI } from '../../utils/api'; // Import API
 import { useAuth } from '../../context/AuthContext'; // Import Auth Context
 import { useNavigate } from 'react-router-dom';
 
@@ -16,43 +16,15 @@ const Onboarding = () => {
     const [message, setMessage] = useState({ type: '', text: '' });
 
     // State for Education
-    const [education, setEducation] = useState([
-        { institution: '', degree: '', field: '', startYear: '', endYear: '' }
-    ]);
+    const [education, setEducation] = useState([]);
+    const [showEduModal, setShowEduModal] = useState(false);
+    const [newEdu, setNewEdu] = useState({ institution: '', degree: '', field: '', startYear: '', endYear: '' });
 
     // State for Experience
-    const [experience, setExperience] = useState([
-        { company: '', role: '', startDate: '', endDate: '' }
-    ]);
+    const [experience, setExperience] = useState([]);
+    const [showExpModal, setShowExpModal] = useState(false);
+    const [newExp, setNewExp] = useState({ company: '', role: '', startDate: '', endDate: '' });
 
-    // Load existing data when user is available
-    useEffect(() => {
-        if (user) {
-            console.log("Onboarding: Loading user data", user);
-            if (user.education && user.education.length > 0) {
-                console.log("Onboarding: Setting education", user.education);
-                setEducation(user.education.map(e => ({
-                    institution: e.institution || '',
-                    degree: e.degree || '',
-                    field: e.field || '',
-                    startYear: e.startYear || '',
-                    endYear: e.endYear || e.yearOfPassing || ''
-                })));
-            } else {
-                console.log("Onboarding: No existing education data found");
-            }
-
-            if (user.experience && user.experience.length > 0) {
-                console.log("Onboarding: Setting experience", user.experience);
-                setExperience(user.experience.map(e => ({
-                    company: e.companyName || e.company || '',
-                    role: e.designation || e.role || '',
-                    startDate: e.startDate || '',
-                    endDate: e.endDate || ''
-                })));
-            }
-        }
-    }, [user]);
 
 
     // State for Documents
@@ -88,15 +60,11 @@ const Onboarding = () => {
 
 
     // --- Handlers for Education ---
-    const handleEducationChange = (index, e) => {
-        const { name, value } = e.target;
-        const list = [...education];
-        list[index][name] = value;
-        setEducation(list);
-    };
-
     const addEducation = () => {
-        setEducation([...education, { institution: '', degree: '', field: '', startYear: '', endYear: '' }]);
+        if (!newEdu.institution || !newEdu.degree) return;
+        setEducation([...education, { ...newEdu }]);
+        setNewEdu({ institution: '', degree: '', field: '', startYear: '', endYear: '' });
+        setShowEduModal(false);
     };
 
     const removeEducation = (index) => {
@@ -106,15 +74,11 @@ const Onboarding = () => {
     };
 
     // --- Handlers for Experience ---
-    const handleExperienceChange = (index, e) => {
-        const { name, value } = e.target;
-        const list = [...experience];
-        list[index][name] = value;
-        setExperience(list);
-    };
-
     const addExperience = () => {
-        setExperience([...experience, { company: '', role: '', startDate: '', endDate: '' }]);
+        if (!newExp.company || !newExp.role) return;
+        setExperience([...experience, { ...newExp }]);
+        setNewExp({ company: '', role: '', startDate: '', endDate: '' });
+        setShowExpModal(false);
     };
 
     const removeExperience = (index) => {
@@ -147,16 +111,40 @@ const Onboarding = () => {
         }
 
         try {
-            const filteredEducation = education.filter(e => e.institution && e.degree);
-            const filteredExperience = experience.filter(e => e.company && e.role);
+            const newEducation = education.filter(e => e.institution && e.degree);
+            const newExperience = experience.filter(e => e.company && e.role);
+
+            // Fetch existing education/experience so we append, not replace
+            let existingEducation = [];
+            let existingExperience = [];
+            try {
+                const profileRes = await employeeAPI.getProfile(token, user.employeeId);
+                const profileData = profileRes.user || profileRes.data || profileRes.employee || profileRes;
+                existingEducation = Array.isArray(profileData.education) ? profileData.education : [];
+                existingExperience = Array.isArray(profileData.experience) ? profileData.experience : [];
+            } catch (_) { }
+
+            // Merge existing + new (avoid exact duplicates by institution+degree)
+            const mergedEducation = [
+                ...existingEducation,
+                ...newEducation.filter(ne =>
+                    !existingEducation.some(ee => ee.institution === ne.institution && ee.degree === ne.degree)
+                )
+            ];
+            const mergedExperience = [
+                ...existingExperience,
+                ...newExperience.filter(ne =>
+                    !existingExperience.some(ee => (ee.companyName || ee.company) === ne.company && (ee.designation || ee.role) === ne.role)
+                )
+            ];
 
             let response;
 
             if (kycFile || resumeFile || extraDocs.some(d => d.file)) {
                 // Use FormData (multipart) when files are present
                 response = await onboardingAPI.submitWithFiles(token, {
-                    education: filteredEducation,
-                    experience: filteredExperience,
+                    education: mergedEducation,
+                    experience: mergedExperience,
                     kycFile: kycFile,
                     resumeFile: resumeFile,
                     extraFiles: extraDocs.filter(d => d.file).map(d => ({ name: d.name || 'Document', file: d.file }))
@@ -164,8 +152,8 @@ const Onboarding = () => {
             } else {
                 // Use JSON when no files
                 response = await onboardingAPI.submit(token, {
-                    education: filteredEducation,
-                    experience: filteredExperience
+                    education: mergedEducation,
+                    experience: mergedExperience
                 });
             }
 
@@ -257,110 +245,42 @@ const Onboarding = () => {
                     {/* Education Section */}
                     {activeSection === 'education' && (
                         <div>
+                            {/* Added Education Cards */}
                             {education.map((edu, index) => (
-                                <div key={index} style={{ marginBottom: '20px', padding: '20px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                                        <h4 style={{ margin: 0, color: '#1e293b' }}>Education #{index + 1}</h4>
-                                        {education.length > 1 && (
-                                            <button onClick={() => removeEducation(index)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px' }}>Remove</button>
-                                        )}
+                                <div key={index} style={{ marginBottom: '12px', padding: '16px 20px', background: '#f0f9ff', borderRadius: '12px', border: '1px solid #bae6fd', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <p style={{ margin: 0, fontWeight: '600', color: '#1e293b', fontSize: '14px' }}>{edu.degree} — {edu.institution}</p>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>{edu.field} {edu.startYear && `· ${edu.startYear}${edu.endYear ? ` - ${edu.endYear}` : ''}`}</p>
                                     </div>
-                                    <div className="grid-2-col" style={{ gap: '16px' }}>
-                                        <input
-                                            type="text"
-                                            name="institution"
-                                            placeholder="Institution Name"
-                                            value={edu.institution}
-                                            onChange={(e) => handleEducationChange(index, e)}
-                                            style={inputStyle}
-                                        />
-                                        <input
-                                            type="text"
-                                            name="degree"
-                                            placeholder="Degree"
-                                            value={edu.degree}
-                                            onChange={(e) => handleEducationChange(index, e)}
-                                            style={inputStyle}
-                                        />
-                                        <input
-                                            type="text"
-                                            name="field"
-                                            placeholder="Field of Study (e.g. Computer Science)"
-                                            value={edu.field}
-                                            onChange={(e) => handleEducationChange(index, e)}
-                                            style={inputStyle}
-                                        />
-                                        <input
-                                            type="number"
-                                            name="startYear"
-                                            placeholder="Start Year"
-                                            value={edu.startYear}
-                                            onChange={(e) => handleEducationChange(index, e)}
-                                            style={inputStyle}
-                                        />
-                                        <input
-                                            type="number"
-                                            name="endYear"
-                                            placeholder="End Year"
-                                            value={edu.endYear}
-                                            onChange={(e) => handleEducationChange(index, e)}
-                                            style={inputStyle}
-                                        />
-                                    </div>
+                                    <button onClick={() => removeEducation(index)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Remove</button>
                                 </div>
                             ))}
-                            <button onClick={addEducation} style={secondaryButtonStyle}>+ Add More Education</button>
+
+                            {/* Add Education Button */}
+                            <button onClick={() => setShowEduModal(true)} style={{ ...secondaryButtonStyle, marginTop: education.length > 0 ? '8px' : '0' }}>
+                                + Add Education
+                            </button>
                         </div>
                     )}
 
                     {/* Experience Section */}
                     {activeSection === 'experience' && (
                         <div>
+                            {/* Added Experience Cards */}
                             {experience.map((exp, index) => (
-                                <div key={index} style={{ marginBottom: '20px', padding: '20px', background: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                                        <h4 style={{ margin: 0, color: '#1e293b' }}>Experience #{index + 1}</h4>
-                                        {experience.length > 1 && (
-                                            <button onClick={() => removeExperience(index)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px' }}>Remove</button>
-                                        )}
+                                <div key={index} style={{ marginBottom: '12px', padding: '16px 20px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #a7f3d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div>
+                                        <p style={{ margin: 0, fontWeight: '600', color: '#1e293b', fontSize: '14px' }}>{exp.role} — {exp.company}</p>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>{exp.startDate && `${exp.startDate}${exp.endDate ? ` to ${exp.endDate}` : ' - Present'}`}</p>
                                     </div>
-                                    <div className="grid-2-col" style={{ gap: '16px' }}>
-                                        <input
-                                            type="text"
-                                            name="company"
-                                            placeholder="Company Name"
-                                            value={exp.company}
-                                            onChange={(e) => handleExperienceChange(index, e)}
-                                            style={inputStyle}
-                                        />
-                                        <input
-                                            type="text"
-                                            name="role"
-                                            placeholder="Role / Designation"
-                                            value={exp.role}
-                                            onChange={(e) => handleExperienceChange(index, e)}
-                                            style={inputStyle}
-                                        />
-                                        <input
-                                            type="date"
-                                            name="startDate"
-                                            placeholder="Start Date"
-                                            value={exp.startDate}
-                                            onChange={(e) => handleExperienceChange(index, e)}
-                                            style={inputStyle}
-                                        />
-                                        <input
-                                            type="date"
-                                            name="endDate"
-                                            placeholder="End Date"
-                                            value={exp.endDate}
-                                            onChange={(e) => handleExperienceChange(index, e)}
-                                            style={inputStyle}
-                                        />
-                                    </div>
+                                    <button onClick={() => removeExperience(index)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Remove</button>
                                 </div>
                             ))}
-                            <button onClick={addExperience} style={secondaryButtonStyle}>+ Add More Experience</button>
+
+                            {/* Add Experience Button */}
+                            <button onClick={() => setShowExpModal(true)} style={{ ...secondaryButtonStyle, marginTop: experience.length > 0 ? '8px' : '0' }}>
+                                + Add Experience
+                            </button>
                         </div>
                     )}
 
@@ -506,6 +426,79 @@ const Onboarding = () => {
 
                 </div>
             </div>
+
+            {/* Add Education Modal */}
+            {showEduModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+                    <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', width: '95%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+                        <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', color: '#1e293b' }}>Add Education</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {[
+                                { label: 'Institution Name', field: 'institution', placeholder: 'e.g. Bangalore Institute of Technology' },
+                                { label: 'Degree', field: 'degree', placeholder: 'e.g. Bachelor of Technology (B.Tech)' },
+                                { label: 'Field of Study', field: 'field', placeholder: 'e.g. Computer Science Engineering' },
+                                { label: 'Start Year', field: 'startYear', placeholder: 'e.g. 2019', type: 'number' },
+                                { label: 'End Year', field: 'endYear', placeholder: 'e.g. 2023', type: 'number' },
+                            ].map(({ label, field, placeholder, type = 'text' }) => (
+                                <div key={field}>
+                                    <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>{label}</label>
+                                    <input
+                                        type={type}
+                                        placeholder={placeholder}
+                                        value={newEdu[field]}
+                                        onChange={e => setNewEdu(prev => ({ ...prev, [field]: e.target.value }))}
+                                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => setShowEduModal(false)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: '600', cursor: 'pointer' }}>
+                                Cancel
+                            </button>
+                            <button onClick={addEducation} disabled={!newEdu.institution || !newEdu.degree} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: (!newEdu.institution || !newEdu.degree) ? '#cbd5e1' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', fontWeight: '600', cursor: (!newEdu.institution || !newEdu.degree) ? 'not-allowed' : 'pointer' }}>
+                                Add Education
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Experience Modal */}
+            {showExpModal && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+                    <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', width: '95%', maxWidth: '480px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+                        <h3 style={{ margin: '0 0 24px 0', fontSize: '20px', color: '#1e293b' }}>Add Experience</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            {[
+                                { label: 'Company Name', field: 'company', placeholder: 'e.g. Infosys Ltd' },
+                                { label: 'Role / Designation', field: 'role', placeholder: 'e.g. Frontend Developer' },
+                                { label: 'Start Date', field: 'startDate', type: 'date' },
+                                { label: 'End Date (leave blank if current)', field: 'endDate', type: 'date' },
+                            ].map(({ label, field, placeholder = '', type = 'text' }) => (
+                                <div key={field}>
+                                    <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>{label}</label>
+                                    <input
+                                        type={type}
+                                        placeholder={placeholder}
+                                        value={newExp[field]}
+                                        onChange={e => setNewExp(prev => ({ ...prev, [field]: e.target.value }))}
+                                        style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => setShowExpModal(false)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: '600', cursor: 'pointer' }}>
+                                Cancel
+                            </button>
+                            <button onClick={addExperience} disabled={!newExp.company || !newExp.role} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: (!newExp.company || !newExp.role) ? '#cbd5e1' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', fontWeight: '600', cursor: (!newExp.company || !newExp.role) ? 'not-allowed' : 'pointer' }}>
+                                Add Experience
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Layout>
     );
 };

@@ -21,6 +21,11 @@ const EmployeeDetail = () => {
     const [isAttModalOpen, setIsAttModalOpen] = useState(false);
     const [attFormData, setAttFormData] = useState({ date: '', status: 'PRESENT', remarks: '' });
     const [attSaving, setAttSaving] = useState(false);
+    const [uploadMonth, setUploadMonth] = useState(new Date().getMonth() + 1);
+    const [uploadYear, setUploadYear] = useState(new Date().getFullYear());
+    const [uploadFile, setUploadFile] = useState(null);
+    const [uploadStatus, setUploadStatus] = useState('');
+    const [isUploading, setIsUploading] = useState(false);
 
     const handleDownload = async (url, filename = 'document.pdf') => {
         try {
@@ -140,6 +145,55 @@ const EmployeeDetail = () => {
         }
     };
 
+    const handleSalaryUpload = async (e) => {
+        if (e) e.preventDefault();
+        if (!uploadFile) {
+            setUploadStatus('Please select a file');
+            return;
+        }
+
+        setIsUploading(true);
+        setUploadStatus('Uploading...');
+
+        const formData = new FormData();
+        formData.append('file', uploadFile);
+        formData.append('employeeId', employee.employeeId);
+        formData.append('month', uploadMonth);
+        formData.append('year', uploadYear);
+
+        try {
+            const response = await payrollAPI.upload(token, formData);
+            if (response.success) {
+                setUploadStatus('Uploaded successfully! 💸');
+                setUploadFile(null);
+                setUploadMonth(new Date().getMonth() + 1);
+                setUploadYear(new Date().getFullYear());
+
+                // Clear the file input in the DOM
+                const fileInput = document.querySelector('input[type="file"]');
+                if (fileInput) fileInput.value = '';
+
+                // Refresh slips
+                const slipsData = await payrollAPI.getByEmployeeId(token, id);
+                if (slipsData && Array.isArray(slipsData)) {
+                    setEmployeeSlips(slipsData);
+                } else if (slipsData?.data && Array.isArray(slipsData.data)) {
+                    setEmployeeSlips(slipsData.data);
+                } else if (slipsData?.salarySlips && Array.isArray(slipsData.salarySlips)) {
+                    setEmployeeSlips(slipsData.salarySlips);
+                }
+                setTimeout(() => setUploadStatus(''), 3000);
+            } else {
+                setUploadStatus(`Failed: ${response.message || 'Error'}`);
+            }
+        } catch (err) {
+            console.error('Upload error:', err);
+            setUploadStatus('Network error occurred');
+        } finally {
+            setIsUploading(false);
+        }
+    };
+
     const handleInlineChange = (date, field, value) => {
         setInlineData(prev => ({
             ...prev,
@@ -188,28 +242,30 @@ const EmployeeDetail = () => {
     // Robust date normalization (avoids timezone shifts)
     const normalizeDate = (d) => {
         if (!d) return '';
-        if (typeof d === 'string') {
-            // Already YYYY-MM-DD
-            if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
-            // ISO string or full date string - take the date part before 'T' or space
-            if (d.includes('T')) return d.split('T')[0];
-            if (d.includes(' ')) return d.split(' ')[0];
-        }
+        if (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
 
         const date = new Date(d);
         if (isNaN(date.getTime())) return '';
 
-        // Extract local components
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
         return `${year}-${month}-${day}`;
     };
 
-    // Generate full attendance history from joining date (or account creation date) to now
-    const joiningDate = employee.personalInfo?.joiningDate || employee.joiningDate || employee.createdAt || new Date().toISOString();
-    const startDate = new Date(joiningDate);
+    // Generate full attendance history from creation date to now
+    let rawJoiningDate = employee.createdAt || employee.personalInfo?.joiningDate || employee.joiningDate;
+
+    // Fallback logic for joining date
+    if (!rawJoiningDate || isNaN(new Date(rawJoiningDate).getTime())) {
+        rawJoiningDate = new Date().toISOString();
+    }
+
+    const startDate = new Date(rawJoiningDate);
+    startDate.setHours(0, 0, 0, 0);
+
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     // Helper to generate all dates
     const allDates = [];
@@ -235,32 +291,99 @@ const EmployeeDetail = () => {
 
         if (record) {
             const actualRemarks = record.remarks || record.remark || '';
+            const status = record.status?.toUpperCase() || 'ABSENT';
             return {
                 ...record,
-                date: dateStr, // Normalize date string
+                date: dateStr,
+                status,
                 remarks: actualRemarks === 'No record found' ? '' : actualRemarks
             };
         }
 
         return {
             date: dateStr,
-            status: 'ABSENT', // Default for missing records
-            remarks: '' // Keep empty so it doesn't persist in data
+            status: 'ABSENT',
+            remarks: ''
         };
     });
 
-    // Counts - combine saved records with unsaved inline changes to keep UI in sync
-    const mergedAttendance = fullAttendanceHistory.map(record => ({
-        ...record,
-        status: inlineData[record.date]?.status || record.status
-    }));
-
-    const presentDays = mergedAttendance.filter(a => a.status?.toUpperCase() === 'PRESENT').length;
-    const leaveDays = mergedAttendance.filter(a => a.status?.toUpperCase() === 'LEAVE').length;
-    const absentDays = mergedAttendance.filter(a => a.status?.toUpperCase() === 'ABSENT').length;
+    // Counts based on the generated history
+    const presentDays = fullAttendanceHistory.filter(a => a.status === 'PRESENT').length;
+    const leaveDays = fullAttendanceHistory.filter(a => a.status === 'LEAVE').length;
+    const absentDays = fullAttendanceHistory.filter(a => a.status === 'ABSENT').length;
 
     const renderSalarySlips = () => (
         <div className="salary-list">
+            <div className="upload-section" style={{
+                background: '#f8fafc',
+                padding: '20px',
+                borderRadius: '12px',
+                marginBottom: '24px',
+                border: '1px solid #e2e8f0'
+            }}>
+                <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>Upload New Salary Slip</h4>
+                <form onSubmit={handleSalaryUpload} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'end' }}>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Month</label>
+                        <select
+                            value={uploadMonth}
+                            onChange={(e) => setUploadMonth(e.target.value)}
+                            style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                        >
+                            {monthNames.map((m, i) => (
+                                <option key={i + 1} value={i + 1}>{m}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Year</label>
+                        <select
+                            value={uploadYear}
+                            onChange={(e) => setUploadYear(e.target.value)}
+                            style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
+                        >
+                            <option value="2025">2025</option>
+                            <option value="2026">2026</option>
+                        </select>
+                    </div>
+                    <div style={{ gridColumn: '1 / span 2' }}>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>PDF File</label>
+                        <input
+                            type="file"
+                            accept=".pdf"
+                            onChange={(e) => setUploadFile(e.target.files[0])}
+                            style={{ width: '100%', fontSize: '13px' }}
+                        />
+                    </div>
+                    <button
+                        type="submit"
+                        disabled={isUploading}
+                        style={{
+                            padding: '10px 20px',
+                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontWeight: '700',
+                            cursor: isUploading ? 'not-allowed' : 'pointer',
+                            opacity: isUploading ? 0.7 : 1
+                        }}
+                    >
+                        {isUploading ? 'Uploading...' : 'Upload'}
+                    </button>
+                    {uploadStatus && (
+                        <div style={{
+                            gridColumn: '1 / -1',
+                            marginTop: '10px',
+                            fontSize: '13px',
+                            color: uploadStatus.includes('successfully') ? '#10b981' : '#f59e0b',
+                            fontWeight: '600'
+                        }}>
+                            {uploadStatus}
+                        </div>
+                    )}
+                </form>
+            </div>
             {employeeSlips.length > 0 ? (
                 employeeSlips.map(slip => (
                     <div key={slip._id} className="salary-item">
@@ -276,17 +399,32 @@ const EmployeeDetail = () => {
                                 <span className="salary-date">Uploaded on {new Date(slip.uploadedAt).toLocaleDateString()}</span>
                             </div>
                         </div>
-                        <button
-                            className="download-btn"
-                            onClick={() => handleView(slip.fileUrl || slip.url)}
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                <polyline points="7 10 12 15 17 10"></polyline>
-                                <line x1="12" y1="15" x2="12" y2="3"></line>
-                            </svg>
-                            View/Download
-                        </button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                                className="view-btn"
+                                onClick={() => handleView(slip.fileUrl || slip.url)}
+                                style={{
+                                    fontSize: '12px', color: '#0369a1', background: '#e0f2fe',
+                                    padding: '6px 12px', borderRadius: '20px', fontWeight: '600',
+                                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                }}
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
+                                View
+                            </button>
+                            <button
+                                className="download-btn"
+                                onClick={() => handleDownload(slip.fileUrl || slip.url, `Salary_${monthNames[slip.month - 1]}_${slip.year}.pdf`)}
+                                style={{
+                                    fontSize: '12px', color: '#065f46', background: '#d1fae5',
+                                    padding: '6px 12px', borderRadius: '20px', fontWeight: '600',
+                                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                }}
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                                Download
+                            </button>
+                        </div>
                     </div>
                 ))
             ) : (

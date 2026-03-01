@@ -111,6 +111,12 @@
 .nav-icon svg {
     width: 20px;
     height: 20px;
+    transition: all 0.2s ease;
+}
+
+.sidebar.closed .nav-icon svg {
+    width: 22px;
+    height: 22px;
 }
 
 .nav-text {
@@ -129,6 +135,11 @@
 .sidebar-footer {
     padding: 20px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    transition: padding 0.3s ease;
+}
+
+.sidebar.closed .sidebar-footer {
+    padding: 20px 10px;
 }
 
 .logout-button {
@@ -136,7 +147,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 14px 16px;
+    padding: 8px 12px;
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid rgba(239, 68, 68, 0.3);
     border-radius: 10px;
@@ -145,6 +156,16 @@
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
+}
+
+.sidebar.closed .logout-button {
+    padding: 0;
+    background: transparent;
+    border: none;
+    width: 40px;
+    height: 40px;
+    margin: 0 auto;
+    justify-content: center;
 }
 
 .logout-button:hover {
@@ -156,6 +177,12 @@
 .logout-button svg {
     width: 20px;
     height: 20px;
+    transition: all 0.2s ease;
+}
+
+.sidebar.closed .logout-button svg {
+    width: 24px;
+    height: 24px;
 }
 
 .sidebar.closed .logout-button span {
@@ -234,6 +261,10 @@
 .toggle-sidebar svg {
     width: 20px;
     height: 20px;
+}
+
+.mobile-toggle-only {
+    display: none;
 }
 
 .page-title {
@@ -346,6 +377,10 @@
 
     .page-content {
         padding: 20px;
+    }
+
+    .mobile-toggle-only {
+        display: flex;
     }
 }
 

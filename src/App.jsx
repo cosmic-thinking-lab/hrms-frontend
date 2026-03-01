@@ -23,7 +23,6 @@ import SalarySlip from "./pages/employee/SalarySlip";
 import EmployeeManagement from "./pages/admin/EmployeeManagement";
 import ManageHolidays from "./pages/admin/ManageHolidays";
 import ManagePolicies from "./pages/admin/ManagePolicies";
-import SalaryUpload from "./pages/admin/SalaryUpload";
 import EmployeeDetail from "./pages/admin/EmployeeDetail";
 
 function App() {
@@ -134,14 +133,6 @@ function App() {
             element={
               <ProtectedRoute adminOnly={true}>
                 <ManagePolicies />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/salary-upload"
-            element={
-              <ProtectedRoute adminOnly={true}>
-                <SalaryUpload />
               </ProtectedRoute>
             }
           />
