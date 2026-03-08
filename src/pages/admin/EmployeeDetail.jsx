@@ -6,6 +6,8 @@ import { useAuth } from '../../context/AuthContext';
 import { employeeAPI, payrollAPI, attendanceAPI } from '../../utils/api';
 import { monthNames } from '../../utils/dummyData';
 import './EmployeeDetail.css';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 
 const EmployeeDetail = () => {
     const { id } = useParams();
@@ -274,7 +276,10 @@ const EmployeeDetail = () => {
     today.setHours(0, 0, 0, 0);
 
     while (currentIter <= today) {
-        allDates.push(new Date(currentIter));
+        const dayOfWeek = currentIter.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) { // skip Saturday (6) and Sunday (0)
+            allDates.push(new Date(currentIter));
+        }
         currentIter.setDate(currentIter.getDate() + 1);
     }
 
@@ -535,12 +540,22 @@ const EmployeeDetail = () => {
                             )}
                             <div style={{ marginBottom: '16px' }}>
                                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Date</label>
-                                <input
-                                    type="date"
+                                <DatePicker
+                                    selected={attFormData.date ? new Date(attFormData.date) : null}
+                                    onChange={(date) => {
+                                        if (!date) return;
+                                        setAttFormData({ ...attFormData, date: normalizeDate(date), _isWeekend: false });
+                                    }}
+                                    minDate={new Date(rawJoiningDate)}
+                                    filterDate={(date) => date.getDay() !== 0 && date.getDay() !== 6}
+                                    dateFormat="yyyy-MM-dd"
+                                    placeholderText="Select a weekday..."
                                     required
-                                    value={attFormData.date}
-                                    onChange={(e) => setAttFormData({ ...attFormData, date: e.target.value })}
-                                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}
+                                    customInput={
+                                        <input
+                                            style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', boxSizing: 'border-box', cursor: 'pointer' }}
+                                        />
+                                    }
                                 />
                             </div>
                             <div style={{ marginBottom: '16px' }}>

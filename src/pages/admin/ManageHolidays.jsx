@@ -31,13 +31,6 @@ const ManageHolidays = () => {
     return (
         <Layout menuItems={menuItems} title="Manage Holidays">
             <div className="container-responsive">
-                <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button className="view-button" style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white', padding: '14px 28px' }}>
-                        <svg style={{ width: '20px', height: '20px' }} viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" strokeWidth="2" /></svg>
-                        Add Holiday
-                    </button>
-                </div>
-
                 <div className="card-responsive">
                     <div style={{ display: 'grid', gap: '16px' }}>
                         {holidayList.map((holiday, index) => (

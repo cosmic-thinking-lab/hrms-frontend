@@ -6,6 +6,7 @@ import {
   Navigate,
 } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -25,13 +26,21 @@ import ManageHolidays from "./pages/admin/ManageHolidays";
 import ManagePolicies from "./pages/admin/ManagePolicies";
 import EmployeeDetail from "./pages/admin/EmployeeDetail";
 
+// Redirects already-authenticated users straight to their dashboard
+const SmartRedirect = () => {
+  const { isAuthenticated, isAdmin, loading } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Login />;
+  return <Navigate to={isAdmin ? "/admin/dashboard" : "/employee/dashboard"} replace />;
+};
+
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<SmartRedirect />} />
+          <Route path="/login" element={<SmartRedirect />} />
 
           {/* Employee Routes */}
           <Route
