@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import Layout from '../../components/Layout';
 import { getEmployeeMenuItems } from '../../utils/menuConfig.jsx';
-import { onboardingAPI, employeeAPI } from '../../utils/api'; // Import API
-import { useAuth } from '../../context/AuthContext'; // Import Auth Context
+import { documentAPI } from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const Onboarding = () => {
@@ -28,11 +28,12 @@ const Onboarding = () => {
 
 
     // State for Documents
-    const [extraDocs, setExtraDocs] = useState([{ name: '', file: null }]); // Start with one entry
+    const existingDocs = user?.documents || [];
+    const [extraDocs, setExtraDocs] = useState([{ name: '', file: null }]);
+    const [deletingDocId, setDeletingDocId] = useState(null);
+    const [editingDoc, setEditingDoc] = useState(null); // { docId, name, file }
 
-    const addExtraDoc = () => {
-        setExtraDocs([...extraDocs, { name: '', file: null }]);
-    };
+    const addExtraDoc = () => setExtraDocs([...extraDocs, { name: '', file: null }]);
 
     const removeExtraDoc = (index) => {
         const list = [...extraDocs];
@@ -41,32 +42,52 @@ const Onboarding = () => {
     };
 
     const handleExtraDocName = (index, value) => {
-        // Check for duplicates
-        const isDuplicate = extraDocs.some((doc, i) => i !== index && doc.name.toLowerCase() === value.toLowerCase() && value.trim() !== '');
-        if (isDuplicate) {
-            setMessage({ type: 'error', text: `Document named "${value}" is already added.` });
-        } else if (message.text.includes('already added')) {
-            setMessage({ type: '', text: '' });
-        }
-
         const list = [...extraDocs];
         list[index].name = value;
         setExtraDocs(list);
     };
 
     const handleExtraDocFile = (index, file) => {
-        // Check for duplicate files (by name and size)
-        const isDuplicateFile = extraDocs.some((doc, i) => i !== index && doc.file && doc.file.name === file.name && doc.file.size === file.size);
-        if (isDuplicateFile) {
-            setMessage({ type: 'error', text: `File "${file.name}" has already been uploaded.` });
-            return;
-        } else if (message.text.includes('already been uploaded')) {
-            setMessage({ type: '', text: '' });
-        }
-
         const list = [...extraDocs];
         list[index].file = file;
         setExtraDocs(list);
+    };
+
+    const handleDeleteDoc = async (docId) => {
+        if (!window.confirm('Delete this document?')) return;
+        setDeletingDocId(docId);
+        try {
+            const res = await documentAPI.remove(token, docId);
+            if (res.success || res.message?.toLowerCase().includes('success')) {
+                updateUser({ ...user, documents: existingDocs.filter(d => d._id !== docId) });
+                setMessage({ type: 'success', text: 'Document deleted.' });
+            } else {
+                setMessage({ type: 'error', text: res.message || 'Failed to delete.' });
+            }
+        } catch {
+            setMessage({ type: 'error', text: 'Network error.' });
+        } finally {
+            setDeletingDocId(null);
+        }
+    };
+
+    const handleUpdateDoc = async () => {
+        if (!editingDoc?.file) return;
+        setLoading(true);
+        try {
+            const res = await documentAPI.update(token, editingDoc.docId, editingDoc.file, editingDoc.name);
+            if (res.success || res.message?.toLowerCase().includes('success')) {
+                updateUser(res.user || {});
+                setMessage({ type: 'success', text: 'Document updated.' });
+                setEditingDoc(null);
+            } else {
+                setMessage({ type: 'error', text: res.message || 'Failed to update.' });
+            }
+        } catch {
+            setMessage({ type: 'error', text: 'Network error.' });
+        } finally {
+            setLoading(false);
+        }
     };
 
 
@@ -103,8 +124,10 @@ const Onboarding = () => {
 
     const handleSubmit = async () => {
         setLoading(true);
-        if (!token || !user?.employeeId) {
-            setMessage({ type: 'error', text: 'Your session has expired. Please log in again.' });
+        setMessage({ type: '', text: '' });
+
+        if (!token) {
+            setMessage({ type: 'error', text: 'Session expired. Please log in again.' });
             setLoading(false);
             setTimeout(() => navigate('/login'), 2000);
             return;
@@ -113,104 +136,39 @@ const Onboarding = () => {
         if (activeSection === 'documents') {
             const validDocs = extraDocs.filter(d => d.file && d.name.trim());
             if (validDocs.length === 0) {
-                setMessage({ type: 'error', text: 'Please add at least one document with a name and PDF.' });
-                setLoading(false);
-                return;
-            }
-            // Check for names without files or vice-versa
-            const incomplete = extraDocs.some(d => (d.name.trim() && !d.file) || (!d.name.trim() && d.file));
-            if (incomplete) {
-                setMessage({ type: 'error', text: 'Please ensure all added documents have both a name and a file.' });
+                setMessage({ type: 'error', text: 'Please add at least one document with a name and file.' });
                 setLoading(false);
                 return;
             }
         }
 
         try {
-            const newEducation = education.filter(e => e.institution && e.degree);
-            const newExperience = experience.filter(e => e.company && e.role);
-
-            // Fetch existing education/experience so we append, not replace
-            let existingEducation = [];
-            let existingExperience = [];
-            try {
-                const profileRes = await employeeAPI.getProfile(token, user.employeeId);
-                const profileData = profileRes.user || profileRes.data || profileRes.employee || profileRes;
-                existingEducation = Array.isArray(profileData.education) ? profileData.education : [];
-                existingExperience = Array.isArray(profileData.experience) ? profileData.experience : [];
-            } catch (_) { }
-
-            // Merge existing + new (avoid exact duplicates by institution+degree)
-            const mergedEducation = [
-                ...existingEducation,
-                ...newEducation.filter(ne =>
-                    !existingEducation.some(ee => ee.institution === ne.institution && ee.degree === ne.degree)
-                )
-            ];
-            const mergedExperience = [
-                ...existingExperience,
-                ...newExperience.filter(ne =>
-                    !existingExperience.some(ee => (ee.companyName || ee.company) === ne.company && (ee.designation || ee.role) === ne.role)
-                )
-            ];
-
             let response;
 
-            if (extraDocs.some(d => d.file)) {
-                // Use FormData (multipart) when files are present
-                response = await onboardingAPI.submitWithFiles(token, {
-                    education: mergedEducation,
-                    experience: mergedExperience,
-                    extraFiles: extraDocs.filter(d => d.file).map(d => ({ name: d.name || 'Document', file: d.file }))
-                });
+            if (activeSection === 'documents') {
+                const validDocs = extraDocs.filter(d => d.file && d.name.trim());
+                response = await documentAPI.upload(token, validDocs);
             } else {
-                // Use JSON when no files
-                response = await onboardingAPI.submit(token, {
-                    education: mergedEducation,
-                    experience: mergedExperience
+                const payload = {
+                    education: education.filter(e => e.institution && e.degree),
+                    experience: experience.filter(e => e.company && e.role)
+                };
+                const res = await fetch(`${BASE_URL}/employees/onboarding`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(payload)
                 });
+                response = await res.json();
             }
-
-            console.log('Onboarding response:', response);
 
             if (response.success || response.message?.toLowerCase().includes('success')) {
-                // Update local user context with the server response data
-                const updatedUser = response.user || {};
-                const profileUpdateData = {
-                    education: updatedUser.education || education.map(e => ({
-                        ...e,
-                        yearOfPassing: e.endYear
-                    })),
-                    experience: updatedUser.experience || experience.map(e => ({
-                        companyName: e.company,
-                        designation: e.role,
-                        startDate: e.startDate,
-                        endDate: e.endDate,
-                        duration: `${e.startDate} - ${e.endDate || 'Present'}`
-                    })),
-                };
-
-                // If server returned documents, use them; otherwise keep local file names
-                if (updatedUser.documents && updatedUser.documents.length > 0) {
-                    profileUpdateData.documents = updatedUser.documents;
-                } else {
-                    profileUpdateData.documents = {
-                        ...(typeof user.documents === 'object' && !Array.isArray(user.documents) ? user.documents : {}),
-                        // Keep current if not returned by server
-                    };
-                }
-
-                updateUser(profileUpdateData);
-                setMessage({ type: 'success', text: 'Onboarding details submitted successfully!' });
-            } else if (response.status === 401 || response.message?.includes('401')) {
-                setMessage({ type: 'error', text: 'Session expired or unauthorized. Please log in again.' });
-                setTimeout(() => { logout(); navigate('/login'); }, 2000);
+                updateUser(response.user || {});
+                setMessage({ type: 'success', text: 'Submitted successfully!' });
             } else {
-                setMessage({ type: 'error', text: response.message || 'Failed to submit details.' });
+                setMessage({ type: 'error', text: response.message || 'Failed to submit. Please try again.' });
             }
         } catch (error) {
-            console.error('Onboarding submission error:', error);
-            setMessage({ type: 'error', text: 'Failed to submit details. Please try again.' });
+            setMessage({ type: 'error', text: 'Network error. Please try again.' });
         } finally {
             setLoading(false);
         }
@@ -303,7 +261,36 @@ const Onboarding = () => {
                     {/* Documents Section */}
                     {activeSection === 'documents' && (
                         <>
-                            {/* Extra Documents */}
+                            {/* Existing Documents */}
+                            {existingDocs.length > 0 && (
+                                <div style={{ marginBottom: '24px' }}>
+                                    <p style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Uploaded Documents</p>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        {existingDocs.map((doc) => (
+                                            <div key={doc._id} style={{ padding: '14px 18px', background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || doc.originalName || 'Document'}</span>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                                                    <button
+                                                        onClick={() => setEditingDoc({ docId: doc._id, name: doc.name || '', file: null })}
+                                                        style={{ padding: '6px 12px', background: '#eef2ff', color: '#4f46e5', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                                                    >Replace</button>
+                                                    <button
+                                                        onClick={() => handleDeleteDoc(doc._id)}
+                                                        disabled={deletingDocId === doc._id}
+                                                        style={{ padding: '6px 12px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                                                    >{deletingDocId === doc._id ? '...' : 'Delete'}</button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* New Documents Upload */}
+                            <p style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Upload New Documents</p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     {extraDocs.map((doc, index) => (
                                         <div key={index} style={{
@@ -472,6 +459,39 @@ const Onboarding = () => {
                             </button>
                             <button onClick={addExperience} disabled={!newExp.company || !newExp.role} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: (!newExp.company || !newExp.role) ? '#cbd5e1' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', fontWeight: '600', cursor: (!newExp.company || !newExp.role) ? 'not-allowed' : 'pointer' }}>
                                 Add Experience
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Replace Document Modal */}
+            {editingDoc && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' }}>
+                    <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', width: '95%', maxWidth: '440px', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+                        <h3 style={{ margin: '0 0 20px 0', fontSize: '18px', color: '#1e293b' }}>Replace Document</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <div>
+                                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>Document Name</label>
+                                <input
+                                    type="text"
+                                    value={editingDoc.name}
+                                    onChange={e => setEditingDoc(prev => ({ ...prev, name: e.target.value }))}
+                                    style={{ width: '100%', padding: '10px 12px', border: '1px solid #e2e8f0', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '13px', fontWeight: '600', color: '#475569', display: 'block', marginBottom: '6px' }}>New PDF File</label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', borderRadius: '8px', border: `1px solid ${editingDoc.file ? '#10b981' : '#cbd5e1'}`, background: editingDoc.file ? '#ecfdf5' : 'white', cursor: 'pointer', fontSize: '13px', color: editingDoc.file ? '#065f46' : '#64748b', fontWeight: '500' }}>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{editingDoc.file ? editingDoc.file.name : 'Choose PDF'}</span>
+                                    <input type="file" accept=".pdf" style={{ display: 'none' }} onChange={e => e.target.files[0] && setEditingDoc(prev => ({ ...prev, file: e.target.files[0] }))} />
+                                </label>
+                            </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '12px', marginTop: '24px', justifyContent: 'flex-end' }}>
+                            <button onClick={() => setEditingDoc(null)} style={{ padding: '10px 20px', borderRadius: '8px', border: '1px solid #e2e8f0', background: '#f8fafc', color: '#64748b', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                            <button onClick={handleUpdateDoc} disabled={!editingDoc.file || loading} style={{ padding: '10px 24px', borderRadius: '8px', border: 'none', background: (!editingDoc.file || loading) ? '#cbd5e1' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: '#fff', fontWeight: '600', cursor: (!editingDoc.file || loading) ? 'not-allowed' : 'pointer' }}>
+                                {loading ? 'Updating...' : 'Update'}
                             </button>
                         </div>
                     </div>

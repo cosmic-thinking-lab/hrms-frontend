@@ -2,13 +2,13 @@ import React from 'react';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../context/AuthContext';
 import { getEmployeeMenuItems } from '../../utils/menuConfig.jsx';
-import { employeeAPI, onboardingAPI } from '../../utils/api';
+import { onboardingAPI, employeeAPI } from '../../utils/api';
 import './Profile.css';
 
 const Profile = () => {
     const { user, token, loading: authLoading } = useAuth();
     const [profileData, setProfileData] = React.useState(null);
-    const [fetching, setFetching] = React.useState(true);
+    const [fetching, setFetching] = React.useState(false);
     const [error, setError] = React.useState('');
 
     // Edit / Delete state
@@ -18,63 +18,9 @@ const Profile = () => {
 
     const menuItems = getEmployeeMenuItems();
 
-    const handleDownload = async (url, filename = 'document.pdf') => {
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const blobUrl = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(blobUrl);
-        } catch (err) {
-            window.open(url, '_blank');
-        }
-    };
-
-    const handleView = async (url) => {
-        try {
-            const response = await fetch(url);
-            const blob = await response.blob();
-            const file = new Blob([blob], { type: 'application/pdf' });
-            const fileURL = URL.createObjectURL(file);
-            window.open(fileURL, '_blank');
-        } catch (err) {
-            window.open(url, '_blank');
-        }
-    };
-
     React.useEffect(() => {
-        const fetchProfile = async () => {
-            if (!user?.employeeId || !token) return;
-
-            try {
-                setFetching(true);
-                const response = await employeeAPI.getProfile(token, user.employeeId);
-
-                if (response.success) {
-                    const actualData = response.user || response.data || response.employee || (response.personalInfo ? response : null);
-
-                    if (actualData) {
-                        setProfileData(actualData);
-                    }
-                } else {
-                    setError(response.message);
-                }
-            } catch (err) {
-                setError('Network error fetching profile');
-            } finally {
-                setFetching(false);
-            }
-        };
-
-        if (!authLoading && user) {
-            fetchProfile();
-        }
-    }, [user, token, authLoading]);
+        if (user) setProfileData(user);
+    }, [user]);
 
     if (authLoading || (fetching && !profileData)) {
         return (
@@ -88,12 +34,6 @@ const Profile = () => {
     }
 
     let displayUser = profileData ? { ...user, ...profileData } : user;
-
-    const serverDocs = profileData?.documents;
-    const hasServerDocs = serverDocs && (Array.isArray(serverDocs) ? serverDocs.length > 0 : Object.keys(serverDocs).length > 0);
-    if (profileData && !hasServerDocs && user.documents) {
-        displayUser.documents = user.documents;
-    }
 
     const personalInfo = displayUser.personalInfo || {};
 
@@ -403,62 +343,41 @@ const Profile = () => {
                     )}
 
                     {/* Documents */}
-                    {displayUser.documents && (Array.isArray(displayUser.documents) ? displayUser.documents.length > 0 : Object.keys(displayUser.documents).length > 0) && (
-                        <div className="profile-section">
-                            <h3 className="section-heading">Documents</h3>
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '20px' }}>
-                                {(() => {
-                                    const docs = displayUser.documents;
-                                    const getDocLabel = (url, index) => {
-                                        if (typeof url !== 'string') return `Document ${index + 1}`;
-                                        const raw = decodeURIComponent(url.split('/').pop().split('?')[0]);
-                                        if (raw.includes('.')) return raw;
-                                        return index === 0 ? 'KYC Document' : 'Professional Resume';
-                                    };
-                                    const docEntries = Array.isArray(docs)
-                                        ? docs.map((doc, i) => {
-                                            const url = typeof doc === 'string' ? doc : (doc.url || doc.fileUrl || '#');
-                                            const label = (typeof doc === 'object' && (doc.name || doc.originalName))
-                                                ? (doc.name || doc.originalName)
-                                                : getDocLabel(url, i);
-                                            return { label, url };
-                                        })
-                                        : Object.entries(docs).map(([key, url]) => {
-                                            const labelMap = { kycUrl: 'KYC Document', resumeUrl: 'Professional Resume' };
-                                            return { label: labelMap[key] || key, url };
-                                        });
-
-                                    return docEntries.map(({ label, url }, index) => {
-                                        if (!url || url === '#') return null;
+                    {(() => {
+                        const docs = displayUser.documents;
+                        if (!Array.isArray(docs) || docs.length === 0) return null;
+                        return (
+                            <div className="profile-section">
+                                <h3 className="section-heading">Documents</h3>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+                                    {docs.map((doc, i) => {
+                                        const label = doc.name || doc.originalName || `Document ${i + 1}`;
+                                        const url = doc.url || doc.fileUrl || doc.path || '';
+                                        if (!url) return null;
                                         return (
-                                            <div key={index} style={{ padding: '20px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                                        <polyline points="14 2 14 8 20 8"></polyline>
-                                                    </svg>
+                                            <div key={doc._id || i} style={{ padding: '18px 20px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                                <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                                 </div>
                                                 <div style={{ overflow: 'hidden', flex: 1 }}>
                                                     <h4 style={{ margin: '0 0 2px 0', fontSize: '14px', fontWeight: '600', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</h4>
                                                     <p style={{ margin: '0 0 10px 0', fontSize: '11px', color: '#94a3b8' }}>PDF Document</p>
                                                     <div style={{ display: 'flex', gap: '8px' }}>
-                                                        <button onClick={() => handleView(url)} style={{ ...cardBtnBase, background: '#e0f2fe', color: '#0369a1' }}>
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
-                                                            View
-                                                        </button>
-                                                        <button onClick={() => handleDownload(url, label + '.pdf')} style={{ ...cardBtnBase, background: '#d1fae5', color: '#065f46' }}>
-                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                                                            Download
-                                                        </button>
+                                                        <button onClick={() => window.open(url, '_blank')} style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '20px', fontWeight: '600', border: 'none', cursor: 'pointer', background: '#e0f2fe', color: '#0369a1' }}>View</button>
+                                                        <button
+                                                            onClick={async () => { try { const r = await fetch(url); const blob = await r.blob(); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = label + '.pdf'; a.click(); } catch { window.open(url, '_blank'); } }}
+                                                            style={{ fontSize: '12px', padding: '4px 12px', borderRadius: '20px', fontWeight: '600', border: 'none', cursor: 'pointer', background: '#d1fae5', color: '#065f46' }}
+                                                        >Download</button>
                                                     </div>
                                                 </div>
                                             </div>
                                         );
-                                    });
-                                })()}
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
+
                 </div>
 
                 {/* Edit Modal */}
