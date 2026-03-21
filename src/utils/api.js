@@ -125,21 +125,30 @@ export const onboardingAPI = {
       },
       body: JSON.stringify(data),
     });
-    if (!response.ok) return { success: false, message: `Error: ${response.status}` };
     const text = await response.text();
-    return text ? JSON.parse(text) : { success: true };
+    let result = {};
+    if (text) { try { result = JSON.parse(text); } catch (e) {} }
+    if (!response.ok) return { success: false, message: result.message || `Error: ${response.status}`, status: response.status };
+    return { success: true, ...result };
   },
   submitWithFiles: async (token, { education, experience, kycFile, resumeFile, extraFiles = [] }) => {
     const formData = new FormData();
     if (education) formData.append("education", JSON.stringify(education));
     if (experience) formData.append("experience", JSON.stringify(experience));
-    if (kycFile) formData.append("files", kycFile);
-    if (resumeFile) formData.append("files", resumeFile);
+    if (kycFile) {
+      formData.append("files", kycFile);
+      formData.append("docNames", "KYC Document");
+    }
+    if (resumeFile) {
+      formData.append("files", resumeFile);
+      formData.append("docNames", "Professional Resume");
+    }
     extraFiles.forEach(({ name, file }) => {
       if (file) {
         // Rename the file with the custom name so the backend stores it with that label
         const renamed = new File([file], `${name || 'document'}.pdf`, { type: file.type });
         formData.append("files", renamed);
+        formData.append("docNames", name || 'document');
       }
     });
     const response = await fetch(`${BASE_URL}/user/onboarding`, {
@@ -149,9 +158,17 @@ export const onboardingAPI = {
       },
       body: formData,
     });
-    if (!response.ok) return { success: false, message: `Error: ${response.status}` };
+    
+    // Always try to read text so we get the real error message
     const text = await response.text();
-    const result = text ? JSON.parse(text) : {};
+    let result = {};
+    if (text) {
+        try { result = JSON.parse(text); } catch(e) {}
+    }
+    
+    if (!response.ok) {
+        return { success: false, message: result.message || `Error: ${response.status}`, status: response.status };
+    }
     return { success: true, ...result };
   },
 };

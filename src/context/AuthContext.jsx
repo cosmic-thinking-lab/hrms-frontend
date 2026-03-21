@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }) => {
         logout,
         updatePassword,
         loading,
-        isAuthenticated: !!user,
+        isAuthenticated: !!user && !!token,
         isAdmin: user?.role === 'ADMIN',
         isEmployee: user?.role === 'EMPLOYEE',
         salarySlips: slips,

@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 
 const Onboarding = () => {
     const menuItems = getEmployeeMenuItems();
-    const { user, token, updateUser } = useAuth(); // Get user, token and updateUser
+    const { user, token, updateUser, logout } = useAuth(); // Get user, token, updateUser and logout
     const navigate = useNavigate();
 
     // State for sections
@@ -28,13 +28,7 @@ const Onboarding = () => {
 
 
     // State for Documents
-    const [kycFile, setKycFile] = useState(null);
-    const [resumeFile, setResumeFile] = useState(null);
-    const kycInputRef = useRef(null);
-    const resumeInputRef = useRef(null);
-
-    // Extra documents (dynamic)
-    const [extraDocs, setExtraDocs] = useState([]); // [{ name: '', file: null }]
+    const [extraDocs, setExtraDocs] = useState([{ name: '', file: null }]); // Start with one entry
 
     const addExtraDoc = () => {
         setExtraDocs([...extraDocs, { name: '', file: null }]);
@@ -47,12 +41,29 @@ const Onboarding = () => {
     };
 
     const handleExtraDocName = (index, value) => {
+        // Check for duplicates
+        const isDuplicate = extraDocs.some((doc, i) => i !== index && doc.name.toLowerCase() === value.toLowerCase() && value.trim() !== '');
+        if (isDuplicate) {
+            setMessage({ type: 'error', text: `Document named "${value}" is already added.` });
+        } else if (message.text.includes('already added')) {
+            setMessage({ type: '', text: '' });
+        }
+
         const list = [...extraDocs];
         list[index].name = value;
         setExtraDocs(list);
     };
 
     const handleExtraDocFile = (index, file) => {
+        // Check for duplicate files (by name and size)
+        const isDuplicateFile = extraDocs.some((doc, i) => i !== index && doc.file && doc.file.name === file.name && doc.file.size === file.size);
+        if (isDuplicateFile) {
+            setMessage({ type: 'error', text: `File "${file.name}" has already been uploaded.` });
+            return;
+        } else if (message.text.includes('already been uploaded')) {
+            setMessage({ type: '', text: '' });
+        }
+
         const list = [...extraDocs];
         list[index].file = file;
         setExtraDocs(list);
@@ -88,26 +99,31 @@ const Onboarding = () => {
     };
 
     // --- Handlers for Documents ---
-    const handleKycClick = () => kycInputRef.current.click();
-    const handleResumeClick = () => resumeInputRef.current.click();
-
-    const handleKycChange = (e) => {
-        if (e.target.files[0]) setKycFile(e.target.files[0]);
-    };
-
-    const handleResumeChange = (e) => {
-        if (e.target.files[0]) setResumeFile(e.target.files[0]);
-    };
+    // (Consolidated into Extra Document Handlers)
 
     const handleSubmit = async () => {
         setLoading(true);
-        setMessage({ type: '', text: '' });
-
-        // Basic Validation
-        if (activeSection === 'documents' && (!kycFile || !resumeFile)) {
-            setMessage({ type: 'error', text: 'Please upload both KYC and Resume documents.' });
+        if (!token || !user?.employeeId) {
+            setMessage({ type: 'error', text: 'Your session has expired. Please log in again.' });
             setLoading(false);
+            setTimeout(() => navigate('/login'), 2000);
             return;
+        }
+
+        if (activeSection === 'documents') {
+            const validDocs = extraDocs.filter(d => d.file && d.name.trim());
+            if (validDocs.length === 0) {
+                setMessage({ type: 'error', text: 'Please add at least one document with a name and PDF.' });
+                setLoading(false);
+                return;
+            }
+            // Check for names without files or vice-versa
+            const incomplete = extraDocs.some(d => (d.name.trim() && !d.file) || (!d.name.trim() && d.file));
+            if (incomplete) {
+                setMessage({ type: 'error', text: 'Please ensure all added documents have both a name and a file.' });
+                setLoading(false);
+                return;
+            }
         }
 
         try {
@@ -140,13 +156,11 @@ const Onboarding = () => {
 
             let response;
 
-            if (kycFile || resumeFile || extraDocs.some(d => d.file)) {
+            if (extraDocs.some(d => d.file)) {
                 // Use FormData (multipart) when files are present
                 response = await onboardingAPI.submitWithFiles(token, {
                     education: mergedEducation,
                     experience: mergedExperience,
-                    kycFile: kycFile,
-                    resumeFile: resumeFile,
                     extraFiles: extraDocs.filter(d => d.file).map(d => ({ name: d.name || 'Document', file: d.file }))
                 });
             } else {
@@ -163,11 +177,11 @@ const Onboarding = () => {
                 // Update local user context with the server response data
                 const updatedUser = response.user || {};
                 const profileUpdateData = {
-                    education: updatedUser.education || filteredEducation.map(e => ({
+                    education: updatedUser.education || education.map(e => ({
                         ...e,
                         yearOfPassing: e.endYear
                     })),
-                    experience: updatedUser.experience || filteredExperience.map(e => ({
+                    experience: updatedUser.experience || experience.map(e => ({
                         companyName: e.company,
                         designation: e.role,
                         startDate: e.startDate,
@@ -182,13 +196,15 @@ const Onboarding = () => {
                 } else {
                     profileUpdateData.documents = {
                         ...(typeof user.documents === 'object' && !Array.isArray(user.documents) ? user.documents : {}),
-                        kycUrl: kycFile ? kycFile.name : (user.documents?.kycUrl || null),
-                        resumeUrl: resumeFile ? resumeFile.name : (user.documents?.resumeUrl || null),
+                        // Keep current if not returned by server
                     };
                 }
 
                 updateUser(profileUpdateData);
                 setMessage({ type: 'success', text: 'Onboarding details submitted successfully!' });
+            } else if (response.status === 401 || response.message?.includes('401')) {
+                setMessage({ type: 'error', text: 'Session expired or unauthorized. Please log in again.' });
+                setTimeout(() => { logout(); navigate('/login'); }, 2000);
             } else {
                 setMessage({ type: 'error', text: response.message || 'Failed to submit details.' });
             }
@@ -287,45 +303,8 @@ const Onboarding = () => {
                     {/* Documents Section */}
                     {activeSection === 'documents' && (
                         <>
-                            <div className="grid-2-col" style={{ gap: '24px' }}>
-                                {/* KYC Section */}
-                                <div style={docBoxStyle(kycFile)}>
-                                    <div style={iconCircleStyle(kycFile)}>
-                                        <svg style={{ width: '32px', height: '32px' }} viewBox="0 0 24 24" fill="none">
-                                            <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 21.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15M17 8L12 3M12 3L7 8M12 3V15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                    </div>
-                                    <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>KYC Documents</h4>
-                                    <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
-                                        {kycFile ? `Selected: ${kycFile.name}` : 'Upload Aadhar, PAN, or Passport (PDF only)'}
-                                    </p>
-                                    <input type="file" ref={kycInputRef} onChange={handleKycChange} style={{ display: 'none' }} accept=".pdf" />
-                                    <button onClick={handleKycClick} style={smallButtonStyle(kycFile)}>
-                                        {kycFile ? 'Change File' : 'Choose KYC'}
-                                    </button>
-                                </div>
-
-                                {/* Resume Section */}
-                                <div style={docBoxStyle(resumeFile)}>
-                                    <div style={iconCircleStyle(resumeFile)}>
-                                        <svg style={{ width: '32px', height: '32px' }} viewBox="0 0 24 24" fill="none">
-                                            <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                        </svg>
-                                    </div>
-                                    <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>Professional Resume</h4>
-                                    <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '16px' }}>
-                                        {resumeFile ? `Selected: ${resumeFile.name}` : 'Upload your latest CV (PDF only)'}
-                                    </p>
-                                    <input type="file" ref={resumeInputRef} onChange={handleResumeChange} style={{ display: 'none' }} accept=".pdf" />
-                                    <button onClick={handleResumeClick} style={smallButtonStyle(resumeFile)}>
-                                        {resumeFile ? 'Change File' : 'Choose Resume'}
-                                    </button>
-                                </div>
-                            </div>
-
                             {/* Extra Documents */}
-                            {extraDocs.length > 0 && (
-                                <div style={{ marginTop: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                     {extraDocs.map((doc, index) => (
                                         <div key={index} style={{
                                             padding: '20px',
@@ -379,8 +358,7 @@ const Onboarding = () => {
                                             </button>
                                         </div>
                                     ))}
-                                </div>
-                            )}
+                            </div>
 
                             {/* Add More Document Button */}
                             <button
