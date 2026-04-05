@@ -1,6 +1,20 @@
 export const BASE_URL = 'http://64.227.146.144:3001/api/v1';
 
-const getToken = () => localStorage.getItem('token');
+const getToken = () => localStorage.getItem('hrms_token');
+
+export const authAPI = {
+    setPassword: async (token, newPassword) => {
+        const response = await fetch(`${BASE_URL}/user/first-login-reset`, {
+            method: 'PATCH',
+            headers: { 
+                'Content-Type': 'application/json', 
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify({ newPassword: newPassword })
+        });
+        return response.json();
+    }
+};
 
 export const employeeAPI = {
     getAll: async (token, search = '', role = '', page = 1, limit = 10) => {
@@ -52,7 +66,7 @@ export const employeeAPI = {
 
 export const onboardingAPI = {
     submit: async (token, data) => {
-        const response = await fetch(`${BASE_URL}/employees/onboarding`, {
+        const response = await fetch(`${BASE_URL}/user/onboarding`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
             body: JSON.stringify(data)
@@ -60,14 +74,21 @@ export const onboardingAPI = {
         return response.json();
     },
 
-    submitWithFiles: async (token, { education, experience, extraFiles }) => {
+    submitWithFiles: async (token, { education = [], experience = [], extraFiles = [] }) => {
         const formData = new FormData();
         formData.append('education', JSON.stringify(education));
         formData.append('experience', JSON.stringify(experience));
-        extraFiles.forEach((doc) => {
-            formData.append('documents', doc.file, doc.name);
-        });
-        const response = await fetch(`${BASE_URL}/employees/onboarding`, {
+
+        if (extraFiles && extraFiles.length > 0) {
+            extraFiles.forEach((doc) => {
+                if (doc.file) {
+                    formData.append('docNames', doc.name || 'Unnamed Document');
+                    formData.append('files', doc.file);
+                }
+            });
+        }
+
+        const response = await fetch(`${BASE_URL}/user/onboarding`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             body: formData
@@ -79,8 +100,11 @@ export const onboardingAPI = {
 export const documentAPI = {
     upload: async (token, docs) => {
         const formData = new FormData();
-        docs.forEach((doc) => formData.append('documents', doc.file, doc.name));
-        const response = await fetch(`${BASE_URL}/employees/onboarding`, {
+        docs.forEach((doc) => {
+            formData.append('docNames', doc.name);
+            formData.append('files', doc.file);
+        });
+        const response = await fetch(`${BASE_URL}/user/onboarding`, {
             method: 'POST',
             headers: { 'Authorization': `Bearer ${token}` },
             body: formData
@@ -91,7 +115,7 @@ export const documentAPI = {
     update: async (token, docId, file, name) => {
         const formData = new FormData();
         formData.append('document', file, name);
-        const response = await fetch(`${BASE_URL}/employees/documents/${docId}`, {
+        const response = await fetch(`${BASE_URL}/user/documents/${docId}`, {
             method: 'PATCH',
             headers: { 'Authorization': `Bearer ${token}` },
             body: formData
@@ -100,7 +124,7 @@ export const documentAPI = {
     },
 
     remove: async (token, docId) => {
-        const response = await fetch(`${BASE_URL}/employees/documents/${docId}`, {
+        const response = await fetch(`${BASE_URL}/user/documents/${docId}`, {
             method: 'DELETE',
             headers: { 'Authorization': `Bearer ${token}` }
         });

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Layout from '../../components/Layout';
 import { getEmployeeMenuItems } from '../../utils/menuConfig.jsx';
-import { documentAPI } from '../../utils/api';
+import { documentAPI, onboardingAPI, BASE_URL } from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -133,39 +133,34 @@ const Onboarding = () => {
             return;
         }
 
-        if (activeSection === 'documents') {
-            const validDocs = extraDocs.filter(d => d.file && d.name.trim());
-            if (validDocs.length === 0) {
-                setMessage({ type: 'error', text: 'Please add at least one document with a name and file.' });
-                setLoading(false);
-                return;
-            }
-        }
-
         try {
-            let response;
+            const validDocs = extraDocs.filter(d => d.file && d.name.trim());
+            const profilePayload = {
+                education: education.length > 0 ? education : (user?.education || []),
+                experience: experience.length > 0 ? experience : (user?.experience || []),
+                extraFiles: validDocs
+            };
 
-            if (activeSection === 'documents') {
-                const validDocs = extraDocs.filter(d => d.file && d.name.trim());
-                response = await documentAPI.upload(token, validDocs);
+            let response;
+            // Always use submitWithFiles if there are new documents being uploaded
+            if (validDocs.length > 0) {
+                response = await onboardingAPI.submitWithFiles(token, profilePayload);
             } else {
-                const payload = {
-                    education: education.filter(e => e.institution && e.degree),
-                    experience: experience.filter(e => e.company && e.role)
-                };
-                const res = await fetch(`${BASE_URL}/employees/onboarding`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify(payload)
-                });
-                response = await res.json();
+                response = await onboardingAPI.submit(token, profilePayload);
             }
 
-            if (response.success || response.message?.toLowerCase().includes('success')) {
-                updateUser(response.user || {});
-                setMessage({ type: 'success', text: 'Submitted successfully!' });
+            if (response.success || response.onboardingStatus === 'completed' || response.user) {
+                if (response.user) {
+                    updateUser(response.user);
+                }
+                setMessage({ type: 'success', text: 'Onboarding data submitted successfully!' });
+                
+                // Reset local draft state after successful sync
+                if (validDocs.length > 0) {
+                    setExtraDocs([{ name: '', file: null }]);
+                }
             } else {
-                setMessage({ type: 'error', text: response.message || 'Failed to submit. Please try again.' });
+                setMessage({ type: 'error', text: response.message || 'Submission failed. Please try again.' });
             }
         } catch (error) {
             setMessage({ type: 'error', text: 'Network error. Please try again.' });
@@ -261,31 +256,42 @@ const Onboarding = () => {
                     {/* Documents Section */}
                     {activeSection === 'documents' && (
                         <>
-                            {/* Existing Documents */}
+                            {/* Existing Documents History - GET Verification */}
                             {existingDocs.length > 0 && (
-                                <div style={{ marginBottom: '24px' }}>
-                                    <p style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '12px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Uploaded Documents</p>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                        {existingDocs.map((doc) => (
-                                            <div key={doc._id} style={{ padding: '14px 18px', background: '#f0fdf4', border: '1px solid #a7f3d0', borderRadius: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                                    <span style={{ fontSize: '14px', fontWeight: '600', color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name || doc.originalName || 'Document'}</span>
+                                <div style={{ marginBottom: '32px' }}>
+                                    <p style={{ fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '16px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Your Uploaded Documents</p>
+                                    <div style={{ display: 'grid', gap: '12px' }}>
+                                        {existingDocs.map((doc, idx) => (
+                                            <div key={doc._id || idx} style={{ padding: '16px 20px', borderRadius: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fff1f2', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
                                                 </div>
-                                                <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-                                                    <button
-                                                        onClick={() => setEditingDoc({ docId: doc._id, name: doc.name || '', file: null })}
-                                                        style={{ padding: '6px 12px', background: '#eef2ff', color: '#4f46e5', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
-                                                    >Replace</button>
-                                                    <button
+                                                <div style={{ flex: 1, overflow: 'hidden' }}>
+                                                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: '#1e293b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{doc.name || `Document ${idx + 1}`}</h4>
+                                                    <p style={{ margin: 0, fontSize: '11px', color: '#94a3b8' }}>Cloudinary Verified</p>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const url = typeof doc === 'string' ? doc : doc.url;
+                                                            if (url) window.open(url, '_blank');
+                                                        }}
+                                                        style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#f0f9ff', color: '#0284c7', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                                                    >
+                                                        View
+                                                    </button>
+                                                    <button 
                                                         onClick={() => handleDeleteDoc(doc._id)}
                                                         disabled={deletingDocId === doc._id}
-                                                        style={{ padding: '6px 12px', background: '#fee2e2', color: '#dc2626', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
-                                                    >{deletingDocId === doc._id ? '...' : 'Delete'}</button>
+                                                        style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#fff1f2', color: '#e11d48', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                                                    >
+                                                        {deletingDocId === doc._id ? '...' : 'Remove'}
+                                                    </button>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
+                                    <div style={{ height: '1px', background: '#e2e8f0', margin: '32px 0' }}></div>
                                 </div>
                             )}
 

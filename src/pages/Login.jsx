@@ -24,7 +24,7 @@ const Login = () => {
 
         if (result.success) {
             if (result.isFirstLogin) {
-                navigate('/employee/onboarding');
+                navigate('/set-password');
             } else if (result.role === 'ADMIN') {
                 navigate('/admin/dashboard');
             } else {

@@ -25,12 +25,18 @@ import EmployeeManagement from "./pages/admin/EmployeeManagement";
 import ManageHolidays from "./pages/admin/ManageHolidays";
 import ManagePolicies from "./pages/admin/ManagePolicies";
 import EmployeeDetail from "./pages/admin/EmployeeDetail";
+import SetPassword from "./pages/SetPassword";
 
 // Redirects already-authenticated users straight to their dashboard
 const SmartRedirect = () => {
-  const { isAuthenticated, isAdmin, loading } = useAuth();
+  const { isAuthenticated, user, isAdmin, loading } = useAuth();
   if (loading) return null;
   if (!isAuthenticated) return <Login />;
+  
+  if (user?.isFirstLogin) {
+    return <Navigate to="/set-password" replace />;
+  }
+  
   return <Navigate to={isAdmin ? "/admin/dashboard" : "/employee/dashboard"} replace />;
 };
 
@@ -142,6 +148,14 @@ function App() {
             element={
               <ProtectedRoute adminOnly={true}>
                 <ManagePolicies />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/set-password"
+            element={
+              <ProtectedRoute>
+                <SetPassword />
               </ProtectedRoute>
             }
           />
