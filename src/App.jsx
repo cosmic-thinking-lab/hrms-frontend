@@ -33,7 +33,7 @@ const SmartRedirect = () => {
   if (loading) return null;
   if (!isAuthenticated) return <Login />;
   
-  if (user?.isFirstLogin) {
+  if (user?.isFirstLogin && !isAdmin) {
     return <Navigate to="/set-password" replace />;
   }
   

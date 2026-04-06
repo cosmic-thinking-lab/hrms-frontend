@@ -20,12 +20,12 @@ const ProtectedRoute = ({ children, adminOnly = false }) => {
     }
 
     // Handle First Login Password Setup
-    if (user?.isFirstLogin && location.pathname !== '/set-password') {
+    if (user?.isFirstLogin && !isAdmin && location.pathname !== '/set-password') {
         return <Navigate to="/set-password" replace />;
     }
 
-    // Prevent access to set-password if not first login
-    if (!user?.isFirstLogin && location.pathname === '/set-password') {
+    // Prevent access to set-password if not first login OR if admin
+    if ((!user?.isFirstLogin || isAdmin) && location.pathname === '/set-password') {
         return <Navigate to={isAdmin ? "/admin/dashboard" : "/employee/dashboard"} replace />;
     }
 

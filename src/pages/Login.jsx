@@ -23,7 +23,7 @@ const Login = () => {
         const result = await login(employeeId, password);
 
         if (result.success) {
-            if (result.isFirstLogin) {
+            if (result.isFirstLogin && result.role !== 'ADMIN') {
                 navigate('/set-password');
             } else if (result.role === 'ADMIN') {
                 navigate('/admin/dashboard');
