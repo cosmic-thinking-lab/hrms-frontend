@@ -1,5 +1,4 @@
-
-const BASE_URL = 'http://64.227.146.144:3001/api/v1';
+const BASE_URL = process.env.VITE_API_BASE_URL || 'https://apis-hrms.duckdns.org/api/v1';
 const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OTg0ZDY2YmZmMmFhOWI5MmU3ZWVlYzkiLCJlbXBsb3llZUlkIjoiRU1QLUFETUlOMSIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc3NDc4MDEwNiwiZXhwIjoxNzc0ODY2NTA2fQ.HRCGgEquY7hEzQl0V5sxiRoNx47oE7M7dECfjlqPMtA';
 
 async function migrate() {
