@@ -83,7 +83,7 @@ const EmployeeDetail = () => {
                     }
 
                     // Fetch real attendance records
-                    const attData = await attendanceAPI.getByEmployeeId(token, id);
+                    const attData = await attendanceAPI.getByUser(token, id);
                     console.log('Initial Attendance Records:', attData);
                     if (attData && attData.success !== false) {
                         const records = attData.records || attData.data || attData.attendance || (Array.isArray(attData) ? attData : []);
@@ -115,20 +115,18 @@ const EmployeeDetail = () => {
         try {
             const payload = {
                 employeeId: id,
-                _id: employee?._id,
                 date: attFormData.date,
                 status: attFormData.status,
-                remarks: attFormData.remarks,
-                remark: attFormData.remarks
+                remarks: attFormData.remarks
             };
             console.log('API Payload:', payload);
 
             const response = await attendanceAPI.mark(token, payload);
             console.log('API Response:', response);
 
-            if (response.success || response.data || response._id) {
+            if (response.attendance || response.success || response.data || response._id) {
                 console.log('Marking Success. Refreshing data...');
-                const attData = await attendanceAPI.getByEmployeeId(token, id);
+                const attData = await attendanceAPI.getByUser(token, id);
                 if (attData && attData.success !== false) {
                     const records = attData.records || attData.data || attData.attendance || (Array.isArray(attData) ? attData : []);
                     setAttendanceRecords(records);
@@ -165,7 +163,10 @@ const EmployeeDetail = () => {
 
         try {
             const response = await payrollAPI.upload(token, formData);
-            if (response.success) {
+            const newSlip = response.salarySlip || response.slip || response.data || response.attendance;
+            const isSuccess = response.success || newSlip || (typeof response.message === 'string' && response.message.toLowerCase().includes('success'));
+
+            if (isSuccess) {
                 setUploadStatus('Uploaded successfully! 💸');
                 setUploadFile(null);
                 setUploadMonth(new Date().getMonth() + 1);
@@ -175,15 +176,25 @@ const EmployeeDetail = () => {
                 const fileInput = document.querySelector('input[type="file"]');
                 if (fileInput) fileInput.value = '';
 
-                // Refresh slips
-                const slipsData = await payrollAPI.getByEmployeeId(token, id);
-                if (slipsData && Array.isArray(slipsData)) {
-                    setEmployeeSlips(slipsData);
-                } else if (slipsData?.data && Array.isArray(slipsData.data)) {
-                    setEmployeeSlips(slipsData.data);
-                } else if (slipsData?.salarySlips && Array.isArray(slipsData.salarySlips)) {
-                    setEmployeeSlips(slipsData.salarySlips);
+                // Optimistically add the new slip so it appears immediately
+                if (newSlip) {
+                    setEmployeeSlips(prev => [newSlip, ...prev]);
                 }
+
+                // Refresh slips from server to get the authoritative list
+                try {
+                    const slipsData = await payrollAPI.getByEmployeeId(token, id);
+                    if (slipsData && Array.isArray(slipsData)) {
+                        setEmployeeSlips(slipsData);
+                    } else if (slipsData?.data && Array.isArray(slipsData.data)) {
+                        setEmployeeSlips(slipsData.data);
+                    } else if (slipsData?.salarySlips && Array.isArray(slipsData.salarySlips)) {
+                        setEmployeeSlips(slipsData.salarySlips);
+                    }
+                } catch (refreshErr) {
+                    console.warn('Could not refresh slips list:', refreshErr);
+                }
+
                 setTimeout(() => setUploadStatus(''), 3000);
             } else {
                 setUploadStatus(`Failed: ${response.message || 'Error'}`);

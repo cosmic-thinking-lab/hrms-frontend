@@ -1,5 +1,5 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import { BASE_URL } from '../utils/api';
+import { authAPI } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -26,15 +26,9 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (employeeId, password) => {
         try {
-            const response = await fetch(`${BASE_URL}/auth/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ employeeId, password }),
-            });
+            const data = await authAPI.login(employeeId, password);
 
-            const data = await response.json();
-
-            if (response.ok && data.token) {
+            if (data?.token) {
                 const userData = data.user;
                 const authToken = data.token;
                 const finalUser = { ...userData, role: userData.role || 'EMPLOYEE' };

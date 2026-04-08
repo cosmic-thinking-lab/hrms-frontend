@@ -46,8 +46,8 @@ const Attendance = () => {
             setLoading(true);
             setError(null);
             const response = await attendanceAPI.getByUser(token, user.employeeId);
-            if (response.success) {
-                const data = response.records || response.data || response.attendance || (Array.isArray(response) ? response : []);
+            const data = response.records || response.data || response.attendance || (Array.isArray(response) ? response : null);
+            if (data !== null) {
                 setAttendanceRecords(Array.isArray(data) ? data : []);
             } else {
                 setError(response.message || 'Failed to fetch attendance');
