@@ -83,7 +83,7 @@ const EmployeeDetail = () => {
                     }
 
                     // Fetch real attendance records
-                    const attData = await attendanceAPI.getByEmployeeId(token, id);
+                    const attData = await attendanceAPI.getByUser(token, id);
                     console.log('Initial Attendance Records:', attData);
                     if (attData && attData.success !== false) {
                         const records = attData.records || attData.data || attData.attendance || (Array.isArray(attData) ? attData : []);
@@ -115,11 +115,9 @@ const EmployeeDetail = () => {
         try {
             const payload = {
                 employeeId: id,
-                _id: employee?._id,
                 date: attFormData.date,
                 status: attFormData.status,
-                remarks: attFormData.remarks,
-                remark: attFormData.remarks
+                remarks: attFormData.remarks
             };
             console.log('API Payload:', payload);
 
@@ -128,7 +126,7 @@ const EmployeeDetail = () => {
 
             if (response.success || response.data || response._id) {
                 console.log('Marking Success. Refreshing data...');
-                const attData = await attendanceAPI.getByEmployeeId(token, id);
+                const attData = await attendanceAPI.getByUser(token, id);
                 if (attData && attData.success !== false) {
                     const records = attData.records || attData.data || attData.attendance || (Array.isArray(attData) ? attData : []);
                     setAttendanceRecords(records);
