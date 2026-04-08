@@ -82,7 +82,7 @@ export const onboardingAPI = {
         if (extraFiles && extraFiles.length > 0) {
             extraFiles.forEach((doc) => {
                 if (doc.file) {
-                    formData.append('docNames', doc.name || 'Unnamed Document');
+                    formData.append('docNames[]', doc.name || 'Unnamed Document');
                     formData.append('files', doc.file);
                 }
             });
