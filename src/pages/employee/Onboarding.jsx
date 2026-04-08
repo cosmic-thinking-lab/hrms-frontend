@@ -15,13 +15,13 @@ const Onboarding = () => {
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
 
-    // State for Education
-    const [education, setEducation] = useState([]);
+    // State for Education — seeded from saved user data (mirrors documents behaviour)
+    const [education, setEducation] = useState(user?.education || []);
     const [showEduModal, setShowEduModal] = useState(false);
     const [newEdu, setNewEdu] = useState({ institution: '', degree: '', field: '', startYear: '', endYear: '' });
 
-    // State for Experience
-    const [experience, setExperience] = useState([]);
+    // State for Experience — seeded from saved user data (mirrors documents behaviour)
+    const [experience, setExperience] = useState(user?.experience || []);
     const [showExpModal, setShowExpModal] = useState(false);
     const [newExp, setNewExp] = useState({ company: '', role: '', startDate: '', endDate: '' });
 
@@ -29,7 +29,7 @@ const Onboarding = () => {
 
     // State for Documents
     const existingDocs = user?.documents || [];
-    const [extraDocs, setExtraDocs] = useState([{ name: '', file: null }]);
+    const [extraDocs, setExtraDocs] = useState([]);
     const [deletingDocId, setDeletingDocId] = useState(null);
     const [editingDoc, setEditingDoc] = useState(null); // { docId, name, file }
 
@@ -136,8 +136,8 @@ const Onboarding = () => {
         try {
             const validDocs = extraDocs.filter(d => d.file && d.name.trim());
             const profilePayload = {
-                education: education.length > 0 ? education : (user?.education || []),
-                experience: experience.length > 0 ? experience : (user?.experience || []),
+                education,
+                experience,
                 extraFiles: validDocs
             };
 

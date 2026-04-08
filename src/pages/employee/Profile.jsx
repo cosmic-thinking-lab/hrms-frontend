@@ -43,7 +43,7 @@ const Profile = () => {
     const email = personalInfo.email || displayUser.email || 'N/A';
     const phone = personalInfo.phone || displayUser.phone || 'N/A';
     const address = personalInfo.address || displayUser.address || 'N/A';
-    const dob = personalInfo.dob || displayUser.dob || null;
+    const dob = personalInfo.dateOfBirth || displayUser.dateOfBirth || null;
     const designation = personalInfo.designation || displayUser.designation || displayUser.role || 'Employee';
     const department = personalInfo.department || displayUser.department || 'N/A';
     const joiningDate = personalInfo.joiningDate || displayUser.joiningDate || null;
