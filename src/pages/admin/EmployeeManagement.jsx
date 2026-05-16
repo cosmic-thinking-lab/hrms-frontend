@@ -164,6 +164,28 @@ const EmployeeManagement = () => {
         }
     };
 
+    const handleStatusToggle = async (employee) => {
+        const newStatus = employee.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+        
+        try {
+            const payload = { status: newStatus };
+            const response = await employeeAPI.update(token, employee.employeeId, payload);
+            
+            const isSuccess = response.success || 
+                             response._id || 
+                             response.status === 200 || 
+                             response.message?.toLowerCase().includes('success');
+
+            if (isSuccess) {
+                fetchEmployees();
+            } else {
+                console.error('Status update failed:', response);
+            }
+        } catch (err) {
+            console.error('Error toggling status:', err);
+        }
+    };
+
     return (
         <Layout menuItems={menuItems} title="Employee Management">
             <div className="container-responsive">
@@ -252,15 +274,33 @@ const EmployeeManagement = () => {
                                                 <div style={{ fontSize: '12px', color: '#64748b' }}>{emp.personalInfo?.department || 'N/A'}</div>
                                             </td>
                                             <td style={{ padding: '16px 24px' }}>
-                                                <span style={{
-                                                    fontSize: '11px',
-                                                    fontWeight: '700',
-                                                    padding: '4px 10px',
-                                                    borderRadius: '20px',
-                                                    background: emp.status === 'ACTIVE' ? '#ecfdf5' : '#fff7ed',
-                                                    color: emp.status === 'ACTIVE' ? '#059669' : '#d97706',
-                                                    textTransform: 'uppercase'
-                                                }}>{emp.status || 'ACTIVE'}</span>
+                                                <button 
+                                                    onClick={() => handleStatusToggle(emp)}
+                                                    style={{
+                                                        fontSize: '11px',
+                                                        fontWeight: '800',
+                                                        padding: '6px 12px',
+                                                        borderRadius: '20px',
+                                                        background: emp.status === 'ACTIVE' ? '#ecfdf5' : '#fef2f2',
+                                                        color: emp.status === 'ACTIVE' ? '#059669' : '#ef4444',
+                                                        border: `1px solid ${emp.status === 'ACTIVE' ? '#10b981' : '#f87171'}`,
+                                                        textTransform: 'uppercase',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.2s',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px'
+                                                    }}
+                                                    title={`Click to mark as ${emp.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'}`}
+                                                >
+                                                    <div style={{ 
+                                                        width: '8px', 
+                                                        height: '8px', 
+                                                        borderRadius: '50%', 
+                                                        background: emp.status === 'ACTIVE' ? '#10b981' : '#ef4444' 
+                                                    }}></div>
+                                                    {emp.status || 'ACTIVE'}
+                                                </button>
                                             </td>
                                             <td style={{ padding: '16px 24px' }}>
                                                 <div style={{ display: 'flex', gap: '8px' }}>

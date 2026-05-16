@@ -72,15 +72,6 @@ const HolidayList = () => {
                                         </span>
                                     </div>
                                 </div>
-                                <div style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    color: holiday.isDisabled ? '#94a3b8' : '#10b981',
-                                    fontWeight: '600',
-                                    fontSize: '14px'
-                                }}>
-                                    {holiday.isDisabled ? 'Inactive' : 'Upcoming'}
-                                </div>
                             </div>
                         ))}
                     </div>

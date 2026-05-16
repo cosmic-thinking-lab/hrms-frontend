@@ -150,6 +150,24 @@ const Profile = () => {
         }
     };
 
+    const handleOpen = async (url, label = 'document') => {
+        if (!url) return;
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const blob = await response.blob();
+            // Force the blob to be treated as a PDF
+            const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+            const blobUrl = URL.createObjectURL(pdfBlob);
+            window.open(blobUrl, '_blank');
+            // Clean up after a short delay to allow the tab to load
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        } catch (err) {
+            console.warn('Blob opening failed, falling back to direct link:', err);
+            window.open(url, '_blank');
+        }
+    };
+
     // --- Styles ---
     const cardBtnBase = {
         fontSize: '12px',
@@ -349,12 +367,16 @@ const Profile = () => {
 
                         const getFullUrl = (doc) => {
                             if (!doc) return '';
+                            // Priority: url > fileUrl > document > any other path-like property
                             const raw = typeof doc === 'string'
                                 ? doc
-                                : (doc.url || doc.fileUrl || doc.path || doc.filePath || doc.document || doc.src || doc.href || doc.file_url || '');
+                                : (doc.url || doc.fileUrl || doc.document || doc.path || doc.filePath || doc.src || doc.href || doc.file_url || '');
+                            
                             if (!raw || raw === '#') return '';
                             if (raw.startsWith('http')) return raw;
-                            const backEndRoot = BASE_URL.replace('/api/v1', '');
+                            
+                            // If it's a relative path, construct it from the base server URL
+                            const backEndRoot = BASE_URL.split('/api/v1')[0];
                             const cleanPath = raw.startsWith('/') ? raw.substring(1) : raw;
                             return `${backEndRoot}/${cleanPath}`;
                         };
@@ -418,7 +440,7 @@ const Profile = () => {
                                                     {url ? (
                                                         <>
                                                             <button
-                                                                onClick={() => window.open(url, '_blank')}
+                                                                onClick={() => handleOpen(url, label)}
                                                                 style={{
                                                                     flex: 1,
                                                                     fontSize: '13px',
@@ -426,6 +448,7 @@ const Profile = () => {
                                                                     borderRadius: '10px',
                                                                     fontWeight: '600',
                                                                     border: 'none',
+                                                                    textDecoration: 'none',
                                                                     cursor: 'pointer',
                                                                     background: '#f0f9ff',
                                                                     color: '#0284c7',

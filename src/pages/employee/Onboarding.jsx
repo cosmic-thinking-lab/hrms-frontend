@@ -91,6 +91,13 @@ const Onboarding = () => {
     };
 
 
+    const formatDate = (dateString) => {
+        if (!dateString || dateString === 'Present') return dateString || 'N/A';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return dateString;
+        return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+    };
+
     // --- Handlers for Education ---
     const addEducation = () => {
         if (!newEdu.institution || !newEdu.degree) return;
@@ -169,6 +176,26 @@ const Onboarding = () => {
         }
     };
 
+    const handleView = async (doc) => {
+        const url = typeof doc === 'string' ? doc : doc.url;
+        if (!url) return;
+        
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('Network response was not ok');
+            const blob = await response.blob();
+            // Force the blob to be treated as a PDF
+            const pdfBlob = new Blob([blob], { type: 'application/pdf' });
+            const blobUrl = URL.createObjectURL(pdfBlob);
+            window.open(blobUrl, '_blank');
+            // Clean up after a short delay
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+        } catch (err) {
+            console.warn('Blob opening failed, falling back to direct link:', err);
+            window.open(url, '_blank');
+        }
+    };
+
     return (
         <Layout menuItems={menuItems} title="Onboarding">
             <div className="container-responsive">
@@ -240,7 +267,7 @@ const Onboarding = () => {
                                 <div key={index} style={{ marginBottom: '12px', padding: '16px 20px', background: '#f0fdf4', borderRadius: '12px', border: '1px solid #a7f3d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <div>
                                         <p style={{ margin: 0, fontWeight: '600', color: '#1e293b', fontSize: '14px' }}>{exp.role} — {exp.company}</p>
-                                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>{exp.startDate && `${exp.startDate}${exp.endDate ? ` to ${exp.endDate}` : ' - Present'}`}</p>
+                                        <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: '#64748b' }}>{exp.startDate && `${formatDate(exp.startDate)}${exp.endDate ? ` to ${formatDate(exp.endDate)}` : ' - Present'}`}</p>
                                     </div>
                                     <button onClick={() => removeExperience(index)} style={{ color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}>Remove</button>
                                 </div>
@@ -272,10 +299,7 @@ const Onboarding = () => {
                                                 </div>
                                                 <div style={{ display: 'flex', gap: '8px' }}>
                                                     <button 
-                                                        onClick={() => {
-                                                            const url = typeof doc === 'string' ? doc : doc.url;
-                                                            if (url) window.open(url, '_blank');
-                                                        }}
+                                                        onClick={() => handleView(doc)}
                                                         style={{ padding: '8px 12px', borderRadius: '8px', border: 'none', background: '#f0f9ff', color: '#0284c7', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                                                     >
                                                         View

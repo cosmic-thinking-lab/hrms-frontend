@@ -15,7 +15,7 @@ const EmployeeDetail = () => {
     const navigate = useNavigate();
     const [employee, setEmployee] = useState(null);
     const [employeeSlips, setEmployeeSlips] = useState([]);
-    const [activeTab, setActiveTab] = useState('salary');
+    const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [inlineData, setInlineData] = useState({}); // { [date]: { status, remarks } }
@@ -28,6 +28,7 @@ const EmployeeDetail = () => {
     const [uploadFile, setUploadFile] = useState(null);
     const [uploadStatus, setUploadStatus] = useState('');
     const [isUploading, setIsUploading] = useState(false);
+    const [editingSlip, setEditingSlip] = useState(null); // Track if we are editing an existing slip
 
     const handleDownload = async (url, filename = 'document.pdf') => {
         try {
@@ -145,30 +146,183 @@ const EmployeeDetail = () => {
         }
     };
 
+    const renderProfile = () => {
+        const personalInfo = employee.personalInfo || {};
+        const education = employee.education || [];
+        const experience = employee.experience || [];
+
+        const formatDate = (dateString) => {
+            if (!dateString || dateString === 'Present') return dateString || 'N/A';
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString;
+            return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        };
+
+        const DetailItem = ({ label, value, fullWidth }) => (
+            <div style={{ 
+                padding: '8px 0', 
+                gridColumn: fullWidth ? '1 / -1' : 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px'
+            }}>
+                <span style={{ 
+                    fontSize: '13px', 
+                    fontWeight: '800', 
+                    color: '#4338ca', 
+                    textTransform: 'uppercase', 
+                    letterSpacing: '0.05em',
+                    marginBottom: '2px'
+                }}>{label}</span>
+                <span style={{ fontSize: '16px', color: '#0f172a', fontWeight: '600' }}>{value || 'N/A'}</span>
+            </div>
+        );
+
+        const SectionHeader = ({ title }) => (
+            <h3 style={{ 
+                fontSize: '16px', 
+                fontWeight: '700', 
+                color: '#1e293b', 
+                marginBottom: '24px', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px',
+                background: '#f8fafc',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                borderLeft: '4px solid #4f46e5',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+            }}>
+                {title}
+            </h3>
+        );
+
+        return (
+            <div style={{ padding: '32px' }}>
+                {/* Personal Info Grid */}
+                <div style={{ marginBottom: '48px' }}>
+                    <SectionHeader title="Personal Details" />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', padding: '0 16px' }}>
+                        <DetailItem label="Email Address" value={personalInfo.email || employee.email} />
+                        <DetailItem label="Phone Number" value={personalInfo.phone} />
+                        <DetailItem label="Date of Birth" value={formatDate(personalInfo.dateOfBirth)} />
+                        <DetailItem label="Joining Date" value={formatDate(personalInfo.joiningDate || employee.joiningDate)} />
+                        <DetailItem label="Current Address" value={personalInfo.address} fullWidth />
+                    </div>
+                </div>
+
+                {/* Education Section */}
+                <div style={{ marginBottom: '48px' }}>
+                    <SectionHeader title="Education History" />
+                    {education.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', padding: '0 16px' }}>
+                            {education.map((edu, idx) => (
+                                <div key={idx} style={{ 
+                                    display: 'grid', 
+                                    gridTemplateColumns: '1fr 1fr', 
+                                    gap: '24px',
+                                    paddingBottom: idx === education.length - 1 ? 0 : '24px',
+                                    borderBottom: idx === education.length - 1 ? 'none' : '1px solid #f1f5f9'
+                                }}>
+                                    <DetailItem label="Degree" value={edu.degree} />
+                                    <DetailItem label="Field of Study" value={edu.field} />
+                                    <DetailItem label="Institution" value={edu.institution} />
+                                    <DetailItem label="Duration / Passing Year" value={edu.startYear ? `${edu.startYear} - ${edu.endYear || edu.yearOfPassing || 'N/A'}` : (edu.yearOfPassing || 'N/A')} />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p style={{ color: '#94a3b8', fontSize: '14px', fontStyle: 'italic', padding: '0 16px' }}>No education details available</p>
+                    )}
+                </div>
+
+                {/* Experience Section */}
+                <div style={{ marginBottom: '16px' }}>
+                    <SectionHeader title="Work Experience" />
+                    {experience.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px', padding: '0 16px' }}>
+                            {experience.map((exp, idx) => (
+                                <div key={idx} style={{ 
+                                    display: 'grid', 
+                                    gridTemplateColumns: '1fr 1fr', 
+                                    gap: '24px',
+                                    paddingBottom: idx === experience.length - 1 ? 0 : '24px',
+                                    borderBottom: idx === experience.length - 1 ? 'none' : '1px solid #f1f5f9'
+                                }}>
+                                    <DetailItem label="Designation" value={exp.designation || exp.role} />
+                                    <DetailItem label="Company" value={exp.companyName || exp.company} />
+                                    <DetailItem label="Start Date" value={formatDate(exp.startDate)} />
+                                    <DetailItem label="End Date" value={formatDate(exp.endDate) || 'Present'} />
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p style={{ color: '#94a3b8', fontSize: '14px', fontStyle: 'italic', padding: '0 16px' }}>No work experience available</p>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
     const handleSalaryUpload = async (e) => {
         if (e) e.preventDefault();
-        if (!uploadFile) {
+        if (!uploadFile && !editingSlip) {
             setUploadStatus('Please select a file');
             return;
         }
 
+        // --- Date range validation ---
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-indexed
+
+        const selectedYear = parseInt(uploadYear, 10);
+        const selectedMonth = parseInt(uploadMonth, 10);
+
+        // Get joining date for validation
+        let rawJoin = employee.personalInfo?.joiningDate || employee.joiningDate || employee.createdAt;
+        let joinYear = currentYear;
+        let joinMonth = 1;
+        if (rawJoin && !isNaN(new Date(rawJoin).getTime())) {
+            const joinDate = new Date(rawJoin);
+            joinYear = joinDate.getFullYear();
+            joinMonth = joinDate.getMonth() + 1;
+        }
+
+        // Block future months for new joiners
+        if (joinYear === currentYear && selectedYear === currentYear && selectedMonth > currentMonth) {
+            setUploadStatus(`For new joiners, you can only upload up to ${monthNames[currentMonth - 1]}.`);
+            return;
+        }
+
+        // Block months before joining date
+        if (selectedYear < joinYear || (selectedYear === joinYear && selectedMonth < joinMonth)) {
+            setUploadStatus(`Cannot select a month before joining (${monthNames[joinMonth - 1]} ${joinYear}).`);
+            return;
+        }
+        // --- End validation ---
+
         setIsUploading(true);
-        setUploadStatus('Uploading...');
+        setUploadStatus(editingSlip ? 'Updating...' : 'Uploading...');
 
         const formData = new FormData();
-        formData.append('file', uploadFile);
+        if (uploadFile) formData.append('file', uploadFile);
         formData.append('employeeId', employee.employeeId);
         formData.append('month', uploadMonth);
         formData.append('year', uploadYear);
 
         try {
-            const response = await payrollAPI.upload(token, formData);
-            const newSlip = response.salarySlip || response.slip || response.data || response.attendance;
+            const response = editingSlip 
+                ? await payrollAPI.update(token, editingSlip._id, formData)
+                : await payrollAPI.upload(token, formData);
+                
+            const newSlip = response.salarySlip || response.slip || response.data;
             const isSuccess = response.success || newSlip || (typeof response.message === 'string' && response.message.toLowerCase().includes('success'));
 
             if (isSuccess) {
-                setUploadStatus('Uploaded successfully! 💸');
+                setUploadStatus(editingSlip ? 'Updated successfully! ✨' : 'Uploaded successfully! 💸');
                 setUploadFile(null);
+                setEditingSlip(null);
                 setUploadMonth(new Date().getMonth() + 1);
                 setUploadYear(new Date().getFullYear());
 
@@ -176,23 +330,11 @@ const EmployeeDetail = () => {
                 const fileInput = document.querySelector('input[type="file"]');
                 if (fileInput) fileInput.value = '';
 
-                // Optimistically add the new slip so it appears immediately
-                if (newSlip) {
-                    setEmployeeSlips(prev => [newSlip, ...prev]);
-                }
-
-                // Refresh slips from server to get the authoritative list
-                try {
-                    const slipsData = await payrollAPI.getByEmployeeId(token, id);
-                    if (slipsData && Array.isArray(slipsData)) {
-                        setEmployeeSlips(slipsData);
-                    } else if (slipsData?.data && Array.isArray(slipsData.data)) {
-                        setEmployeeSlips(slipsData.data);
-                    } else if (slipsData?.salarySlips && Array.isArray(slipsData.salarySlips)) {
-                        setEmployeeSlips(slipsData.salarySlips);
-                    }
-                } catch (refreshErr) {
-                    console.warn('Could not refresh slips list:', refreshErr);
+                // Refresh slips from server
+                const slipsData = await payrollAPI.getByEmployeeId(token, id);
+                if (slipsData) {
+                    const list = slipsData.salarySlips || slipsData.data || (Array.isArray(slipsData) ? slipsData : []);
+                    setEmployeeSlips(list);
                 }
 
                 setTimeout(() => setUploadStatus(''), 3000);
@@ -200,11 +342,19 @@ const EmployeeDetail = () => {
                 setUploadStatus(`Failed: ${response.message || 'Error'}`);
             }
         } catch (err) {
-            console.error('Upload error:', err);
+            console.error('Upload/Update error:', err);
             setUploadStatus('Network error occurred');
         } finally {
             setIsUploading(false);
         }
+    };
+
+    const handleSalaryEdit = (slip) => {
+        setEditingSlip(slip);
+        setUploadMonth(slip.month);
+        setUploadYear(slip.year);
+        // Scroll to form
+        document.querySelector('.upload-section')?.scrollIntoView({ behavior: 'smooth' });
     };
 
     const handleInlineChange = (date, field, value) => {
@@ -267,7 +417,7 @@ const EmployeeDetail = () => {
     };
 
     // Generate full attendance history from creation date to now
-    let rawJoiningDate = employee.createdAt || employee.personalInfo?.joiningDate || employee.joiningDate;
+    let rawJoiningDate = employee.personalInfo?.joiningDate || employee.joiningDate || employee.createdAt;
 
     // Fallback logic for joining date
     if (!rawJoiningDate || isNaN(new Date(rawJoiningDate).getTime())) {
@@ -328,26 +478,81 @@ const EmployeeDetail = () => {
     const leaveDays = fullAttendanceHistory.filter(a => a.status === 'LEAVE').length;
     const absentDays = fullAttendanceHistory.filter(a => a.status === 'ABSENT').length;
 
-    const renderSalarySlips = () => (
+    const renderSalarySlips = () => {
+        // Build allowed year range: from joining year to current year
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth() + 1; // 1-indexed
+
+        let joinYear = currentYear;
+        let joinMonth = 1;
+        let rawJoin = employee.personalInfo?.joiningDate || employee.joiningDate || employee.createdAt;
+        if (rawJoin && !isNaN(new Date(rawJoin).getTime())) {
+            const joinDate = new Date(rawJoin);
+            joinYear = joinDate.getFullYear();
+            joinMonth = joinDate.getMonth() + 1;
+        }
+
+        // Years from joining year to current year
+        const allowedYears = [];
+        for (let y = joinYear; y <= currentYear; y++) allowedYears.push(y);
+
+        const selectedYearInt = parseInt(uploadYear, 10);
+        const selectedMonthInt = parseInt(uploadMonth, 10);
+
+        // Filter months based on selected year
+        const allowedMonths = monthNames
+            .map((m, i) => ({ name: m, value: i + 1 }))
+            .filter(({ value }) => {
+                // If we are looking at the joining year, always block months before join
+                if (selectedYearInt === joinYear && value < joinMonth) return false;
+
+                // If joined IN the current year, block future months for current year selection
+                if (joinYear === currentYear && selectedYearInt === currentYear && value > currentMonth) return false;
+
+                // If joined in the past, "show all months" for the current year (as requested)
+                // This means we don't apply the 'value > currentMonth' restriction if joinYear < currentYear
+                return true;
+            });
+
+        return (
         <div className="salary-list">
             <div className="upload-section" style={{
-                background: '#f8fafc',
+                background: editingSlip ? '#f0f9ff' : '#f8fafc',
                 padding: '20px',
                 borderRadius: '12px',
                 marginBottom: '24px',
-                border: '1px solid #e2e8f0'
+                border: editingSlip ? '1px solid #7dd3fc' : '1px solid #e2e8f0',
+                transition: 'all 0.3s ease'
             }}>
-                <h4 style={{ margin: '0 0 16px 0', fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>Upload New Salary Slip</h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                    <h4 style={{ margin: 0, fontSize: '16px', fontWeight: '700', color: '#1e293b' }}>
+                        {editingSlip ? 'Update Salary Slip' : 'Upload New Salary Slip'}
+                    </h4>
+                    {editingSlip && (
+                        <button 
+                            onClick={() => {
+                                setEditingSlip(null);
+                                setUploadFile(null);
+                                setUploadMonth(new Date().getMonth() + 1);
+                                setUploadYear(new Date().getFullYear());
+                            }}
+                            style={{ background: '#f1f5f9', border: 'none', padding: '4px 12px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', color: '#64748b', cursor: 'pointer' }}
+                        >
+                            Cancel Edit
+                        </button>
+                    )}
+                </div>
                 <form onSubmit={handleSalaryUpload} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '12px', alignItems: 'end' }}>
                     <div>
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Month</label>
                         <select
                             value={uploadMonth}
-                            onChange={(e) => setUploadMonth(e.target.value)}
+                            onChange={(e) => setUploadMonth(Number(e.target.value))}
                             style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
                         >
-                            {monthNames.map((m, i) => (
-                                <option key={i + 1} value={i + 1}>{m}</option>
+                            {allowedMonths.map(({ name, value }) => (
+                                <option key={value} value={value}>{name}</option>
                             ))}
                         </select>
                     </div>
@@ -355,15 +560,26 @@ const EmployeeDetail = () => {
                         <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>Year</label>
                         <select
                             value={uploadYear}
-                            onChange={(e) => setUploadYear(e.target.value)}
+                            onChange={(e) => {
+                                const newYear = Number(e.target.value);
+                                setUploadYear(newYear);
+                                // Reset month to a valid value when year changes
+                                const minMonth = newYear === joinYear ? joinMonth : 1;
+                                const maxMonth = newYear === currentYear ? currentMonth : 12;
+                                if (selectedMonthInt < minMonth) setUploadMonth(minMonth);
+                                else if (selectedMonthInt > maxMonth) setUploadMonth(maxMonth);
+                            }}
                             style={{ width: '100%', padding: '8px', borderRadius: '8px', border: '1px solid #e2e8f0' }}
                         >
-                            <option value="2025">2025</option>
-                            <option value="2026">2026</option>
+                            {allowedYears.map(y => (
+                                <option key={y} value={y}>{y}</option>
+                            ))}
                         </select>
                     </div>
                     <div style={{ gridColumn: '1 / span 2' }}>
-                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>PDF File</label>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#64748b', marginBottom: '6px' }}>
+                            {editingSlip ? 'Replace PDF (Optional)' : 'PDF File'}
+                        </label>
                         <input
                             type="file"
                             accept=".pdf"
@@ -376,7 +592,7 @@ const EmployeeDetail = () => {
                         disabled={isUploading}
                         style={{
                             padding: '10px 20px',
-                            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                            background: editingSlip ? '#0284c7' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
                             color: 'white',
                             border: 'none',
                             borderRadius: '8px',
@@ -385,7 +601,7 @@ const EmployeeDetail = () => {
                             opacity: isUploading ? 0.7 : 1
                         }}
                     >
-                        {isUploading ? 'Uploading...' : 'Upload'}
+                        {isUploading ? (editingSlip ? 'Updating...' : 'Uploading...') : (editingSlip ? 'Update' : 'Upload')}
                     </button>
                     {uploadStatus && (
                         <div style={{
@@ -429,6 +645,17 @@ const EmployeeDetail = () => {
                                 View
                             </button>
                             <button
+                                onClick={() => handleSalaryEdit(slip)}
+                                style={{
+                                    fontSize: '12px', color: '#475569', background: '#f1f5f9',
+                                    padding: '6px 12px', borderRadius: '20px', fontWeight: '600',
+                                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px'
+                                }}
+                            >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                Edit
+                            </button>
+                            <button
                                 className="download-btn"
                                 onClick={() => handleDownload(slip.fileUrl || slip.url, `Salary_${monthNames[slip.month - 1]}_${slip.year}.pdf`)}
                                 style={{
@@ -447,7 +674,8 @@ const EmployeeDetail = () => {
                 <div style={{ padding: '40px', textAlign: 'center', color: '#64748b' }}>No salary slips found for this employee</div>
             )}
         </div>
-    );
+        );
+    };
 
     const renderAttendance = () => (
         <div style={{ padding: '24px' }}>
@@ -750,6 +978,12 @@ const EmployeeDetail = () => {
 
                 <div className="detail-tabs">
                     <button
+                        className={`detail-tab ${activeTab === 'profile' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('profile')}
+                    >
+                        Profile
+                    </button>
+                    <button
                         className={`detail-tab ${activeTab === 'salary' ? 'active' : ''}`}
                         onClick={() => setActiveTab('salary')}
                     >
@@ -770,6 +1004,7 @@ const EmployeeDetail = () => {
                 </div>
 
                 <div className="tab-content">
+                    {activeTab === 'profile' && renderProfile()}
                     {activeTab === 'salary' && renderSalarySlips()}
                     {activeTab === 'attendance' && renderAttendance()}
                     {activeTab === 'documents' && renderDocuments()}
